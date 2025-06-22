@@ -1,0 +1,106 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+## **React Native/Expo Project Rules**
+
+### **Expertise**
+You are an expert in TypeScript, React Native, Expo, Supabase, and mobile app development.
+
+### **Project Organization & Architecture**
+
+- Use a **feature-based directory structure** (`components/`, `screens/`, `services/`, `utils/`).
+- Group files by domain when possible (e.g., `components/restaurants/`, `screens/auth/`).
+- Use `lib/` for low-level logic like the Supabase client or third-party utilities.
+- Place database migrations and configurations in `supabase/` directory.
+
+### **Supabase Integration**
+
+- Use `lib/supabase.js` for the Supabase client configuration.
+- Enable Row Level Security (RLS) and Supabase Auth from day one.
+- Store keys in environment variables and use `.env` for development secrets.
+- Use React Native specific environment variable handling.
+
+### **Code Style and Structure**
+
+- Write concise, technical TypeScript with accurate examples.
+- Use comments to help explain technical concepts and functions.
+- Prefer functional and declarative patterns over classes.
+- Avoid code duplication via helper functions and modular components.
+- Use descriptive variable names with auxiliary verbs (e.g., `isLoading`, `hasError`).
+- File structure should follow: exported component → subcomponents → helpers → static → types.
+
+### **Naming Conventions**
+
+- Use lowercase with dashes for directories (e.g., `components/auth-wizard`).
+- Use named exports for components.
+- Use interfaces instead of types for object shapes.
+- Avoid enums; use plain object maps.
+
+### **TypeScript Usage**
+
+- All code must be written in TypeScript.
+- Prefer interfaces for props and data models.
+- Use functional components with clearly typed props.
+- Avoid `any`; use `unknown` or explicit types when unsure.
+- Use React Native specific types (`ViewStyle`, `TextStyle`, etc.).
+
+### **UI and Styling**
+
+- Use React Native's `StyleSheet` for styling.
+- Follow React Native design patterns and components.
+- Use Expo's built-in components when possible.
+- Implement responsive design using React Native's responsive utilities.
+- Support both iOS and Android design patterns.
+
+### **Performance Optimization**
+
+- Use `FlatList` for long lists instead of `ScrollView`.
+- Implement proper image optimization with Expo's Image component.
+- Use `React.memo` for expensive components.
+- Lazy load non-critical components.
+- Optimize bundle size by avoiding unnecessary dependencies.
+
+### **State Management**
+
+- Use React hooks (`useState`, `useEffect`, `useContext`) appropriately.
+- Use `useReducer` for complex state logic.
+- Avoid global state libraries unless necessary.
+- Use React Native specific state management patterns.
+
+### **Linting**
+
+- Use ESLint, Prettier, and TypeScript strict mode.
+- Validate all inputs with `zod` or similar validation libraries.
+
+### **Developer Experience (DX)**
+
+- `npx expo start` should start cleanly with no TypeScript errors.
+- Document key decisions in `README.md` or `docs/`.
+- Use Expo's debugging tools effectively.
+
+### **Accessibility and UX**
+
+- Use React Native's accessibility props (`accessibilityLabel`, `accessibilityHint`).
+- Ensure proper focus handling and keyboard support.
+- Use consistent spacing and typography.
+- Test on both iOS and Android regularly.
+
+### **Security**
+
+- **Environment Variables**: Never expose secrets in the app bundle. Use `.env` for private keys.
+- **Supabase Row Level Security (RLS)**: Always enable RLS on every table. Write rules that validate user identity via `auth.uid()`.
+- **Auth Guards**: Use client-side validation for all sensitive logic. Implement proper session management.
+- **Supabase Client Access**: Use the `anon` key for public, safe queries. Never expose service role keys in the app.
+- **Input Validation**: Validate all inputs with `zod` or similar. Check session/user IDs before accessing or modifying data.
+- **Limit Data Exposure**: Only return the necessary fields from the database. Avoid exposing sensitive data.
+- **Session Management**: Use Supabase Auth session checks on protected screens. Clear stale sessions on logout.
+
+### **Key Conventions**
+
+- **Mobile-First Design**: Design for mobile interactions and constraints.
+- **Platform Considerations**: Test and optimize for both iOS and Android.
+- **Expo Best Practices**: Follow Expo's recommended patterns and tools.
+
+- **React Native Performance**: Use React Native specific performance optimizations.
