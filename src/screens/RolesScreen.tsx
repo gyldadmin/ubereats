@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 
-export default function RolesView() {
+export default function RolesScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Roles</Text>

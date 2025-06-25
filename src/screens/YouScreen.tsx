@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 
-export default function YouView() {
+export default function YouScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>You</Text>

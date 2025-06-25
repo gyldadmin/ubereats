@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, Image, Linking, Alert } from 'react-native';
 import { Text, Button } from 'react-native-paper';
-import { Restaurant } from '../../../types/restaurant';
+import { Restaurant } from '../../types/restaurant';
 import StarRating from './StarRating';
 import { colors, spacing, typography, layout, shadows, globalStyles } from '../../styles';
 

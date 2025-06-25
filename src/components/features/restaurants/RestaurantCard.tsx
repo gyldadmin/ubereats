@@ -2,9 +2,9 @@ import React from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { Card, Title, Paragraph } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Restaurant } from '../../types/restaurant';
-import StarRating from './ui/StarRating';
-import { colors, spacing, typography, layout, shadows } from '../styles';
+import { Restaurant } from '../types/restaurant';
+import StarRating from '../../ui/StarRating';
+import { colors, spacing, typography, layout, shadows } from '../../../styles';
 
 // Props interface for the component
 interface RestaurantCardProps {

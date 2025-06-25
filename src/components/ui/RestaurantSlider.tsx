@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   Easing,
 } from 'react-native';
-import { Restaurant } from '../../../types/restaurant';
+import { Restaurant } from '../../types/restaurant';
 import RestaurantDetail from './RestaurantDetail';
 import { colors, spacing, layout, shadows, theme } from '../../styles';
 

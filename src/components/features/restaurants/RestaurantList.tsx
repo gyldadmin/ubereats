@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, Alert } from 'react-native';
 import { ActivityIndicator, Text, Card } from 'react-native-paper';
-import { supabase } from '../../lib/supabase';
-import { Restaurant } from '../../types/restaurant';
+import { supabase } from '../../../services/supabase';
+import { Restaurant } from '../../../types/restaurant';
 import RestaurantCard from './RestaurantCard';
-import RestaurantSlider from './ui/RestaurantSlider';
-import { colors, spacing, typography, layout, globalStyles } from '../styles';
+import RestaurantSlider from '../../ui/RestaurantSlider';
+import { colors, spacing, typography, layout, globalStyles } from '../../../styles';
 
 const RestaurantList: React.FC = () => {
   // State management for restaurants data

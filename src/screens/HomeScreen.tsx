@@ -1,8 +1,8 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import RestaurantList from '../RestaurantList';
+import RestaurantList from '../components/features/restaurants/RestaurantList';
 
-export default function HomeView() {
+export default function HomeScreen() {
   return (
     <View style={styles.container}>
       <RestaurantList />
