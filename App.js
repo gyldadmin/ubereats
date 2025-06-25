@@ -1,46 +1,51 @@
+import React from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
-import { supabase } from './lib/supabase';
-import { useEffect, useState } from 'react';
+
+// Import the views
+import HomeView from './src/components/views/HomeView';
+import RolesView from './src/components/views/RolesView';
+import GyldView from './src/components/views/GyldView';
+import YouView from './src/components/views/YouView';
+
+const Tab = createBottomTabNavigator();
+
+// Brand colors
+const BRAND_COLOR = '#13bec7'; // Brand teal color
 
 export default function App() {
-  const [connectionStatus, setConnectionStatus] = useState('Testing connection...');
-
-  useEffect(() => {
-    async function testConnection() {
-      try {
-        const { data, error } = await supabase
-          .from('_dummy_table_that_doesnt_exist')
-          .select('*')
-          .limit(1);
-        
-        if (error && error.code === 'PGRST116') {
-          // This error means connection works but table doesn't exist (which is expected)
-          setConnectionStatus('✅ Supabase connected successfully!');
-        } else {
-          setConnectionStatus('❌ Connection failed: ' + error?.message);
-        }
-      } catch (err) {
-        setConnectionStatus('❌ Connection error: ' + err.message);
-      }
-    }
-    
-    testConnection();
-  }, []);
-
   return (
-    <View style={styles.container}>
-      <Text>{connectionStatus}</Text>
+    <NavigationContainer>
+      <Tab.Navigator
+        screenOptions={({ route }) => ({
+          tabBarIcon: ({ focused, color, size }) => {
+            let iconName;
+
+            if (route.name === 'Home') {
+              iconName = focused ? 'home' : 'home-outline';
+            } else if (route.name === 'Roles') {
+              iconName = focused ? 'shield' : 'shield-outline';
+            } else if (route.name === 'Gyld') {
+              iconName = focused ? 'people' : 'people-outline';
+            } else if (route.name === 'You') {
+              iconName = focused ? 'person-circle' : 'person-circle-outline';
+            }
+
+            return <Ionicons name={iconName} size={size} color={color} />;
+          },
+          tabBarActiveTintColor: BRAND_COLOR,
+          tabBarInactiveTintColor: 'gray',
+          headerShown: false,
+        })}
+      >
+        <Tab.Screen name="Home" component={HomeView} />
+        <Tab.Screen name="Roles" component={RolesView} />
+        <Tab.Screen name="Gyld" component={GyldView} />
+        <Tab.Screen name="You" component={YouView} />
+      </Tab.Navigator>
       <StatusBar style="auto" />
-    </View>
+    </NavigationContainer>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
