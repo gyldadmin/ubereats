@@ -1,18 +1,11 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { ScreenLayout } from '../components/ui';
 import RestaurantList from '../components/features/restaurants/RestaurantList';
 
 export default function HomeScreen() {
   return (
-    <View style={styles.container}>
+    <ScreenLayout>
       <RestaurantList />
-    </View>
+    </ScreenLayout>
   );
-}
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-}); 
+} 

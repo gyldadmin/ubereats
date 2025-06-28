@@ -1,13 +1,28 @@
 /**
- * Main styles export file
- * Import everything you need from here
+ * Styles Index
+ * Central export point for all styling and design system elements
  */
 
-// Export theme and individual modules
+// Core theme system (existing)
 export { theme, colors, spacing, typography, layout, shadows } from './theme';
-
-// Export global styles
 export { globalStyles } from './globalStyles';
+
+// Design System Components (new)
+export { componentStyles } from './componentStyles';
+export { DESIGN_SYSTEM_RULES, COMPONENT_GUIDELINES, VALIDATION_CHECKLIST } from './styleGuide';
+
+/**
+ * IMPORT PATTERNS:
+ * 
+ * // For theme values:
+ * import { theme } from '../styles';
+ * 
+ * // For component styles:
+ * import { componentStyles } from '../styles';
+ * 
+ * // For design system rules (AI reference):
+ * import { DESIGN_SYSTEM_RULES } from '../styles';
+ */
 
 // Export types
 export type { Theme } from './theme';
