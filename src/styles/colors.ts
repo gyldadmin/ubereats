@@ -7,8 +7,10 @@ export const colors = {
   // Brand colors
   primary: '#13bec7',
   primaryLight: '#4dd0d7',
+  primaryLighter: '#7dd3d9',      // Even lighter shade for sub-tabs
   primaryDark: '#0e9ba1',
   primaryAlpha: 'rgba(19, 190, 199, 0.1)',
+  primarySoft: 'rgba(19, 190, 199, 0.15)',  // Soft background for selected tabs
 
   // Background colors
   background: {

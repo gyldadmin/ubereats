@@ -1,34 +1,46 @@
-import React from 'react';
+﻿import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Ionicons } from '@expo/vector-icons';
+import { createStackNavigator } from '@react-navigation/stack';
+import { Feather } from '@expo/vector-icons';
 import { BRAND_COLOR } from '../constants';
+import { useAuthStore } from '../stores';
+import { View, StyleSheet } from 'react-native';
+import { Text } from 'react-native-paper';
 
 // Import the screens
 import { HomeScreen, RolesScreen, GyldScreen, YouScreen } from '../screens';
+import { SignInScreen, SignUpScreen, OnboardingScreen } from '../screens/auth';
 
 const Tab = createBottomTabNavigator();
+const Stack = createStackNavigator();
 
-export default function AppNavigator() {
+// Main app tabs (shown when authenticated)
+function MainTabs() {
   return (
     <Tab.Navigator
+      id="MainTabs"
       screenOptions={({ route }) => ({
         tabBarIcon: ({ focused, color, size }) => {
           let iconName;
 
           if (route.name === 'Home') {
-            iconName = focused ? 'home' : 'home-outline';
+            iconName = 'home';
           } else if (route.name === 'Roles') {
-            iconName = focused ? 'shield' : 'shield-outline';
+            iconName = 'award';
           } else if (route.name === 'Gyld') {
-            iconName = focused ? 'people' : 'people-outline';
+            iconName = 'users';
           } else if (route.name === 'You') {
-            iconName = focused ? 'person-circle' : 'person-circle-outline';
+            iconName = 'user';
           }
 
-          return <Ionicons name={iconName} size={size} color={color} />;
+          return <Feather name={iconName} size={size} color={color} />;
         },
         tabBarActiveTintColor: BRAND_COLOR,
         tabBarInactiveTintColor: 'gray',
+        tabBarLabelStyle: {
+          fontSize: 12, // Slightly bigger than default (11px)
+          fontWeight: '500',
+        },
         headerShown: false,
       })}
     >
@@ -38,4 +50,60 @@ export default function AppNavigator() {
       <Tab.Screen name="You" component={YouScreen} />
     </Tab.Navigator>
   );
-} 
+}
+
+// Auth screens (shown when not authenticated)
+function AuthStack({ hasLoggedInBefore }: { hasLoggedInBefore: boolean }) {
+  // If never logged in from device → show SignUpScreen first
+  // If has logged in before but currently logged out → show SignInScreen first
+  const initialRouteName = hasLoggedInBefore ? 'SignIn' : 'SignUp';
+  
+  return (
+    <Stack.Navigator 
+      id="AuthStack"
+      screenOptions={{ headerShown: false }}
+      initialRouteName={initialRouteName}
+    >
+      <Stack.Screen name="SignIn" component={SignInScreen} />
+      <Stack.Screen name="SignUp" component={SignUpScreen} />
+      <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+    </Stack.Navigator>
+  );
+}
+
+// Loading screen
+function LoadingScreen() {
+  return (
+    <View style={styles.loadingContainer}>
+      <Text variant="headlineMedium">Loading...</Text>
+    </View>
+  );
+}
+
+export default function AppNavigator() {
+  const { user, isLoading, isInitialized, hasLoggedInBefore } = useAuthStore();
+
+  // Show loading screen while initializing
+  if (!isInitialized || isLoading) {
+    return <LoadingScreen />;
+  }
+
+  // Show main app if authenticated
+  if (user) {
+    return <MainTabs />;
+  }
+
+  // Show auth screens based on whether user has logged in before
+  // If never logged in from device → show SignUpScreen
+  // If has logged in before but currently logged out → show SignInScreen
+  return <AuthStack hasLoggedInBefore={hasLoggedInBefore} />;
+}
+
+const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
+});

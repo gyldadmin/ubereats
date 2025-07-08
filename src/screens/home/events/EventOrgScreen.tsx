@@ -1,36 +1,36 @@
 import React, { useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Text } from 'react-native-paper';
-import { FacebookTopNavTabs } from '../components/ui';
-import { theme } from '../styles/theme';
+import { FacebookTopNavTabs } from '../../../components/ui';
+import { theme } from '../../../styles/theme';
 
-export default function GyldScreen() {
-  const [selectedTab, setSelectedTab] = useState('members');
+export default function EventOrgScreen() {
+  const [selectedTab, setSelectedTab] = useState('plan');
 
   const renderContent = () => {
     switch (selectedTab) {
-      case 'members':
-        return <Text variant="bodyLarge">Members List</Text>;
-      case 'mentors':
-        return <Text variant="bodyLarge">Mentors List</Text>;
-      case 'knowledge':
-        return <Text variant="bodyLarge">Knowledge Resources</Text>;
+      case 'plan':
+        return <Text variant="bodyLarge">Plan Content</Text>;
+      case 'resources':
+        return <Text variant="bodyLarge">Resources Content</Text>;
+      case 'edit':
+        return <Text variant="bodyLarge">Edit Content</Text>;
       default:
-        return <Text variant="bodyLarge">Members List</Text>;
+        return <Text variant="bodyLarge">Plan Content</Text>;
     }
   };
 
   return (
     <View style={styles.container}>
-      <Text variant="headlineLarge" style={styles.title}>Gyld</Text>
+      <Text variant="headlineLarge" style={styles.title}>Event Organization</Text>
       
       <FacebookTopNavTabs
         value={selectedTab}
         onValueChange={setSelectedTab}
         buttons={[
-          { value: 'members', label: 'Members' },
-          { value: 'mentors', label: 'Mentors' },
-          { value: 'knowledge', label: 'Knowledge' },
+          { value: 'plan', label: 'Plan' },
+          { value: 'resources', label: 'Resources' },
+          { value: 'edit', label: 'Edit' },
         ]}
         style={styles.segmentedButtons}
       />
