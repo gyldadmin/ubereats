@@ -1,187 +1,182 @@
-﻿import React from 'react';
+﻿import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { Text, Divider } from 'react-native-paper';
+import { Text, ActivityIndicator } from 'react-native-paper';
+import { useNavigation } from '@react-navigation/native';
 import { theme } from '../styles/theme';
-import { 
-  GatheringCardCompactV1, 
-  GatheringCardSquare 
-} from '../components/ui';
-import { useAuthStore } from '../stores';
+import { GatheringCardCompactV1 } from '../components/ui';
+import { useHomeGatherings } from '../hooks/useHomeGatherings';
+import type { GatheringCardData } from '../hooks/useHomeGatherings';
 
-// Sample gathering data with RSVP status
-const sampleGatherings = [
-  {
-    id: '1',
-    title: '1:1 Product Mentoring Session',
-    start_time: '2025-08-08T18:00:00Z',
-    end_time: '2025-08-08T19:30:00Z',
-    experience_type: 'Mentoring',
-    address: 'Remote via Zoom',
-    image: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=800&h=400&fit=crop',
-    description: 'Join us for personalized 1:1 mentoring focused on advancing your product management career.',
-    host_names: ['Alex Chen'],
-    mentor_name: 'Alex Chen',
-    mentor_company: 'Google',
-    participant_count: 0,
-    max_participants: 1,
-    rsvp_status: 'pending' as const,
-  },
-  {
-    id: '2',
-    title: 'Product Professional Happy Hour',
-    start_time: '2025-08-22T18:00:00Z',
-    end_time: '2025-08-22T20:30:00Z',
-    experience_type: 'Happy Hour',
-    address: 'The Hub Boston, 25 Court St, Boston, MA 02108',
-    image: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=800&h=400&fit=crop',
-    description: 'Network with fellow product professionals in a relaxed setting.',
-    host_names: ['Alex Chen', 'Jordan Rivera'],
-    participant_count: 12,
-    max_participants: 25,
-    rsvp_status: 'yes' as const,
-  },
-  {
-    id: '3',
-    title: 'Product Leaders Supper Club',
-    start_time: '2025-09-05T18:00:00Z',
-    end_time: '2025-09-05T20:30:00Z',
-    experience_type: 'Supper Club',
-    address: 'North End Italian Restaurant, 123 Hanover St, Boston, MA 02113',
-    image: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=800&h=400&fit=crop',
-    description: 'Intimate dinner gathering for senior product leaders to discuss industry trends.',
-    host_names: ['Jordan Rivera'],
-    participant_count: 12,
-    max_participants: 12,
-    rsvp_status: 'no' as const,
-  },
-  {
-    id: '4',
-    title: 'Advanced Product Mentoring Workshop',
-    start_time: '2025-08-15T18:00:00Z',
-    end_time: '2025-08-15T19:30:00Z',
-    experience_type: 'Mentoring',
-    address: 'Remote via Zoom',
-    image: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=800&h=400&fit=crop',
-    description: 'Deep-dive mentoring workshop covering advanced product management techniques.',
-    host_names: ['Jordan Rivera'],
-    mentor_name: 'Jordan Rivera',
-    mentor_company: 'Anthropic',
-    participant_count: 1,
-    max_participants: 1,
-    rsvp_status: 'yes' as const,
-  },
-  {
-    id: '5',
-    title: 'Product Strategy Coworking',
-    start_time: '2025-08-29T18:00:00Z',
-    end_time: '2025-08-29T20:00:00Z',
-    experience_type: 'Coworking',
-    address: 'WeWork Boston, 745 Atlantic Ave, Boston, MA 02111',
-    image: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=800&h=400&fit=crop',
-    description: 'Collaborative working session where product managers work on strategic initiatives together.',
-    host_names: ['Alex Chen'],
-    participant_count: 5,
-    max_participants: 8,
-    rsvp_status: 'pending' as const,
-  },
-];
+// Constants for expandable list behavior
+const INITIAL_VISIBLE_COUNT = 3;
 
 export default function HomeScreen() {
-  // Get auth store values for debugging
-  const { user, userName, userGyld, isOrganizer, isLoading, isInitialized, signOut } = useAuthStore();
+  const navigation = useNavigation();
+  const { gatherings, loading, error, refresh, updateRSVP } = useHomeGatherings();
+  
+  // State for show more/less functionality
+  const [isExpanded, setIsExpanded] = useState(false);
 
+  // Helper function to get visible gatherings based on expansion state
+  const getVisibleGatherings = () => {
+    if (isExpanded || gatherings.length <= INITIAL_VISIBLE_COUNT) {
+      return gatherings;
+    }
+    return gatherings.slice(0, INITIAL_VISIBLE_COUNT);
+  };
+
+  // Helper function to determine if toggle button should be shown
+  const shouldShowToggle = () => {
+    return gatherings.length > INITIAL_VISIBLE_COUNT;
+  };
+
+  // Handle toggle expansion
+  const handleToggleExpansion = () => {
+    console.log(`📝 Toggling gathering list: ${isExpanded ? 'collapsing' : 'expanding'}`);
+    setIsExpanded(!isExpanded);
+  };
+
+  // Handle card press navigation
   const handleGatheringPress = (gatheringId: string) => {
     console.log('Gathering pressed:', gatheringId);
     // TODO: Navigate to gathering detail screen
+    // navigation.navigate('GatheringDetail', { gatheringId });
   };
 
-  return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* DEBUG: Auth Store Values */}
-      <View style={styles.debugSection}>
-        <Text variant="titleMedium" style={styles.debugTitle}>
-           DEBUG: Auth Store Values
-        </Text>
-        <Text style={styles.debugText}>
-          Initialized: {isInitialized ? ' Yes' : ' No'}
-        </Text>
-        <Text style={styles.debugText}>
-          Loading: {isLoading ? ' Yes' : ' No'}
-        </Text>
-        <Text style={styles.debugText}>
-          User: {user ? `${user.email || 'No email'} (${user.id})` : ' Not logged in'}
-        </Text>
-        <Text style={styles.debugText}>
-          User Name: {userName || ' No name'}
-        </Text>
-        <Text style={styles.debugText}>
-          User Gyld: {userGyld || ' No gyld'}
-        </Text>
-        <Text style={styles.debugText}>
-          Is Organizer: {isOrganizer ? ' Yes' : ' No'}
-        </Text>
-        
-        {/* Logout Button for Testing */}
-        <TouchableOpacity style={styles.debugButton} onPress={signOut}>
-          <Text style={styles.debugButtonText}> Logout (Test Auth Flow)</Text>
+  // Handle RSVP press (for cycling behavior on yes/no)
+  const handleRSVPPress = (gatheringId: string, currentStatus: 'yes' | 'no' | 'pending') => {
+    // Only handle cycling for non-pending statuses
+    if (currentStatus !== 'pending') {
+      let newStatus: 'yes' | 'no';
+      if (currentStatus === 'yes') {
+        newStatus = 'no';
+      } else {
+        newStatus = 'yes'; // From no back to yes
+      }
+      
+      updateRSVP(gatheringId, newStatus);
+    }
+  };
+
+  // Handle RSVP dropdown selection (for pending status)
+  const handleRSVPSelect = (gatheringId: string, status: 'yes' | 'no') => {
+    console.log('🎯 HomeScreen: handleRSVPSelect called with:', { gatheringId, status });
+    updateRSVP(gatheringId, status);
+  };
+
+  // Handle plan gathering navigation
+  const handlePlanGathering = () => {
+    navigation.navigate('Roles' as never);
+  };
+
+  // Transform data for the existing card component
+  const transformGatheringData = (cardData: GatheringCardData) => {
+    const { gathering, gatheringDisplay, userRole, displayImage, formattedDate, experienceTypeLabel, hostNames, mentorInfo } = cardData;
+
+    // Debug logging for mentor info
+    if (experienceTypeLabel.toLowerCase() === 'mentoring') {
+      console.log('🔄 Transforming mentoring gathering:', gathering.title);
+      console.log('👤 mentorInfo:', mentorInfo);
+      console.log('📝 mentor_satellite:', mentorInfo?.mentor_satellite);
+      console.log('🏢 employer_info:', mentorInfo?.employer_info);
+      console.log('🏷️ mentor_name:', mentorInfo?.mentor_satellite?.full_name);
+      console.log('🏢 mentor_company:', mentorInfo?.employer_info?.name);
+    }
+
+    return {
+      id: gathering.id,
+      title: gathering.title || 'Untitled Gathering',
+      start_time: gathering.start_time || '',
+      end_time: gathering.end_time || '',
+      experience_type: experienceTypeLabel,
+      address: gatheringDisplay?.address || 'Location TBD',
+      image: displayImage,
+      description: gatheringDisplay?.description || 'No description available',
+      host_names: hostNames,
+      mentor_name: mentorInfo?.mentor_satellite?.full_name,
+      mentor_company: mentorInfo?.employer_info?.name,
+      participant_count: 0, // TODO: Calculate from participation_gatherings
+      max_participants: gatheringDisplay?.cap || 0,
+      rsvp_status: userRole.rsvpStatus,
+      userRole: userRole,
+    };
+  };
+
+  // Loading state
+  if (loading) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <Text style={styles.loadingText}>Loading gatherings...</Text>
+      </View>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <View style={styles.centered}>
+        <Text style={styles.errorText}>Error loading gatherings</Text>
+        <TouchableOpacity onPress={refresh} style={styles.retryButton}>
+          <Text style={styles.retryButtonText}>Retry</Text>
         </TouchableOpacity>
       </View>
+    );
+  }
 
-      <Divider style={styles.divider} />
-
+  return (
+    <ScrollView 
+      style={styles.container} 
+      showsVerticalScrollIndicator={false}
+    >
       <View style={styles.header}>
-        <Text variant="headlineLarge" style={styles.title}>
-          Gathering Card Designs
-        </Text>
-        <Text variant="bodyLarge" style={styles.subtitle}>
-          Refined vertical and horizontal layouts with photo variations
+        <Text variant="headlineMedium" style={styles.title}>
+          Upcoming Gatherings
         </Text>
       </View>
 
-      {/* Refined Compact Cards - Vertical List */}
       <View style={styles.section}>
-        <Text variant="titleLarge" style={styles.sectionTitle}>
-          1. Refined Compact Cards (Vertical List)
-        </Text>
-        <Text variant="bodyMedium" style={styles.sectionDescription}>
-          Polished design with consistent bullets, unified colors, and enhanced RSVP visibility
-        </Text>
-        {sampleGatherings.slice(0, 3).map((gathering) => (
-          <GatheringCardCompactV1
-            key={`v1-${gathering.id}`}
-            gathering={gathering}
-            onPress={() => handleGatheringPress(gathering.id)}
-          />
-        ))}
-      </View>
+        {gatherings.length === 0 ? (
+          // No gatherings state
+          <View style={styles.noGatheringsContainer}>
+            <Text style={styles.noGatheringsTitle}>No gatherings on the calendar</Text>
+            <Text style={styles.noGatheringsSubtitle}>
+              Please come back soon or{' '}
+              <TouchableOpacity onPress={handlePlanGathering}>
+                <Text style={styles.planLink}>plan one</Text>
+              </TouchableOpacity>
+            </Text>
+          </View>
+        ) : (
+          <>
+            {/* Gatherings list with expandable functionality */}
+            {getVisibleGatherings().map((gatheringData) => (
+              <GatheringCardCompactV1
+                key={gatheringData.gathering.id}
+                gathering={transformGatheringData(gatheringData)}
+                onPress={() => handleGatheringPress(gatheringData.gathering.id)}
+                onRSVPPress={() => handleRSVPPress(
+                  gatheringData.gathering.id,
+                  gatheringData.userRole.rsvpStatus
+                )}
+                onRSVPSelect={(status) => handleRSVPSelect(gatheringData.gathering.id, status)}
+              />
+            ))}
 
-      <Divider style={styles.divider} />
-
-      {/* Square Cards - Horizontal Scroll */}
-      <View style={styles.section}>
-        <Text variant="titleLarge" style={styles.sectionTitle}>
-          2. Square Cards (Horizontal Scroll)
-        </Text>
-        <Text variant="bodyMedium" style={styles.sectionDescription}>
-          Full information in square format - includes example with square photo (mentor profile pic)
-        </Text>
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.horizontalScroll}
-        >
-          {sampleGatherings.map((gathering, index) => (
-            <GatheringCardSquare
-              key={`square-${gathering.id}`}
-              gathering={gathering}
-              onPress={() => handleGatheringPress(gathering.id)}
-              useSquareImage={index === 1} // Second card shows square image example
-            />
-          ))}
-        </ScrollView>
-        <Text variant="bodySmall" style={styles.photoNote}>
-           The second card shows how it looks with a square mentor profile photo
-        </Text>
+            {/* Show More/Show Less toggle button */}
+            {shouldShowToggle() && (
+              <TouchableOpacity 
+                style={styles.toggleButton} 
+                onPress={handleToggleExpansion}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.toggleButtonText}>
+                  {isExpanded ? 'Show Fewer' : 'Show More'}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </>
+        )}
       </View>
 
       <View style={styles.footer} />
@@ -195,78 +190,80 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.background.primary,
   },
   header: {
-    padding: theme.spacing.lg,
+    paddingTop: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.lg,
+    paddingBottom: theme.spacing.lg,
     alignItems: 'center',
   },
   title: {
     color: theme.colors.text.primary,
     textAlign: 'center',
-    marginBottom: theme.spacing.sm,
     fontWeight: '700',
-  },
-  subtitle: {
-    color: theme.colors.text.secondary,
-    textAlign: 'center',
   },
   section: {
     marginBottom: theme.spacing.xl,
   },
-  sectionTitle: {
-    color: theme.colors.text.primary,
-    fontWeight: '600',
-    marginHorizontal: theme.spacing.lg,
-    marginBottom: theme.spacing.sm,
-  },
-  sectionDescription: {
-    color: theme.colors.text.secondary,
-    marginHorizontal: theme.spacing.lg,
-    marginBottom: theme.spacing.lg,
-  },
-  horizontalScroll: {
-    paddingHorizontal: theme.spacing.lg,
-  },
-  photoNote: {
-    color: theme.colors.text.tertiary,
-    marginHorizontal: theme.spacing.lg,
-    marginTop: theme.spacing.sm,
-    fontStyle: 'italic',
-  },
-  divider: {
-    marginVertical: theme.spacing.xl,
-    backgroundColor: theme.colors.border.light,
-  },
-  debugSection: {
-    backgroundColor: '#fff3cd',
-    padding: theme.spacing.md,
-    margin: theme.spacing.md,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#ffeaa7',
-  },
-  debugTitle: {
-    color: '#8b5000',
-    fontWeight: '700',
-    marginBottom: theme.spacing.sm,
-  },
-  debugText: {
-    color: '#8b5000',
-    fontSize: 12,
-    marginBottom: 4,
-    fontFamily: 'monospace',
-  },
-  debugButton: {
-    backgroundColor: '#d32f2f',
-    padding: 8,
-    borderRadius: 6,
-    marginTop: 8,
-    alignItems: 'center',
-  },
-  debugButtonText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
-  },
   footer: {
     height: theme.spacing.xl,
+  },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: theme.colors.background.primary,
+  },
+  loadingText: {
+    marginTop: theme.spacing.md,
+    color: theme.colors.text.secondary,
+  },
+  errorText: {
+    color: theme.colors.error,
+    textAlign: 'center',
+    marginBottom: theme.spacing.md,
+  },
+  retryButton: {
+    backgroundColor: theme.colors.primary,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.spacing.sm,
+  },
+  retryButtonText: {
+    color: theme.colors.background.primary,
+    fontWeight: '600',
+  },
+  noGatheringsContainer: {
+    padding: theme.spacing.xl,
+    alignItems: 'center',
+  },
+  noGatheringsTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: theme.colors.text.primary,
+    marginBottom: theme.spacing.sm,
+    textAlign: 'center',
+  },
+  noGatheringsSubtitle: {
+    fontSize: 16,
+    color: theme.colors.text.secondary,
+    textAlign: 'center',
+    lineHeight: 24,
+  },
+  planLink: {
+    color: theme.colors.primary,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
+  },
+  toggleButton: {
+    marginTop: theme.spacing.md,
+    marginHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    alignItems: 'center',
+  },
+  toggleButtonText: {
+    color: theme.colors.text.secondary,
+    fontSize: 14,
+    fontWeight: '500',
+    textAlign: 'center',
   },
 });

@@ -3,12 +3,50 @@ import { User } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../services/supabase';
 
+// User satellite table interfaces
+interface UserPublic {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  user_id: string;
+  first: string;
+  full_name: string;
+  title?: string;
+  list?: number;
+  profpic?: string;
+  blurb?: string;
+  candidate?: string;
+  employer?: string;
+  gyld?: string;
+  nomination?: string;
+}
+
+interface UserInternal {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  user_id: string;
+  user_status?: string;
+  activity_type?: string[];
+  proflink?: string;
+  knowledge_domain?: string[];
+  neighborhood?: string;
+  start_field?: string;
+  role_interest?: string[];
+  phone_number?: string;
+  notification_preferences?: object;
+}
+
 interface AuthState {
-  // Core auth data - the 4 approved pieces
+  // Core auth data
   user: User | null;
   userName: string | null;
   userGyld: string | null;
   isOrganizer: boolean;
+  
+  // User satellite data
+  userPublic: UserPublic | null;
+  userInternal: UserInternal | null;
   
   // Auth state management
   isLoading: boolean;
@@ -34,6 +72,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   userName: null,
   userGyld: null,
   isOrganizer: false,
+  userPublic: null,
+  userInternal: null,
   isLoading: false,
   isInitialized: false,
   hasLoggedInBefore: false,
@@ -48,7 +88,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({ hasLoggedInBefore: true });
     } else {
       // Clear user data when user is null
-      set({ userName: null, userGyld: null, isOrganizer: false });
+      set({ 
+        userName: null, 
+        userGyld: null, 
+        isOrganizer: false,
+        userPublic: null,
+        userInternal: null 
+      });
     }
   },
 
@@ -134,7 +180,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
-  // Fetch user's gyld and organizer status from database
+  // Fetch user's satellite data and derived properties from database
   fetchUserData: async () => {
     const { user } = get();
     if (!user) return;
@@ -142,10 +188,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ isLoading: true });
     
     try {
-      // Query users_public table for user information
+      // Query users_public table for complete public profile data
       const { data: userPublic, error: publicError } = await supabase
         .from('users_public')
-        .select('full_name, first, gyld')
+        .select('*')
         .eq('user_id', user.id)
         .single();
 
@@ -153,6 +199,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         console.error('Error fetching user public data:', publicError);
         set({ isLoading: false });
         return;
+      }
+
+      // Query users_internal table for complete internal user data
+      const { data: userInternal, error: internalError } = await supabase
+        .from('users_internal')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (internalError) {
+        console.error('Error fetching user internal data:', internalError);
+        // Continue without internal data - it might not exist yet
       }
 
       // Query gyld table to check if user is organizer
@@ -179,6 +237,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         userName,
         userGyld: userPublic?.gyld || null,
         isOrganizer,
+        userPublic,
+        userInternal,
         isLoading: false,
       });
 
@@ -197,6 +257,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         userName: null,
         userGyld: null,
         isOrganizer: false,
+        userPublic: null,
+        userInternal: null,
         isLoading: false,
       });
     } catch (error) {
@@ -233,6 +295,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             userName: null,
             userGyld: null,
             isOrganizer: false,
+            userPublic: null,
+            userInternal: null,
           });
         }
       });
