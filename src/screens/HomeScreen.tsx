@@ -36,31 +36,47 @@ export default function HomeScreen() {
     setIsExpanded(!isExpanded);
   };
 
-  // Handle card press navigation
-  const handleGatheringPress = (gatheringId: string) => {
-    console.log('Gathering pressed:', gatheringId);
-    // TODO: Navigate to gathering detail screen
-    // navigation.navigate('GatheringDetail', { gatheringId });
-  };
-
-  // Handle RSVP press (for cycling behavior on yes/no)
-  const handleRSVPPress = (gatheringId: string, currentStatus: 'yes' | 'no' | 'pending') => {
-    // Only handle cycling for non-pending statuses
-    if (currentStatus !== 'pending') {
-      let newStatus: 'yes' | 'no';
-      if (currentStatus === 'yes') {
-        newStatus = 'no';
-      } else {
-        newStatus = 'yes'; // From no back to yes
-      }
-      
-      updateRSVP(gatheringId, newStatus);
+  // Handle card press navigation based on user role
+  const handleGatheringPress = (gatheringData: GatheringCardData) => {
+    // Check if user is host of this gathering
+    if (gatheringData.userRole.isHost) {
+      // Navigate to EventOrgScreen for hosts
+      (navigation as any).navigate('EventOrg', { gatheringId: gatheringData.gathering.id });
+    } else {
+      // Navigate to EventDetailScreen for non-hosts
+      (navigation as any).navigate('EventDetail', { 
+        gatheringData: gatheringData 
+      });
     }
   };
 
-  // Handle RSVP dropdown selection (for pending status)
+  // Handle RSVP button press (for non-hosts and non-scribes)
+  const handleRSVPPress = (gatheringId: string, currentStatus: string) => {
+    // Find the gathering data
+    const gatheringData = gatherings.find(g => g.gathering.id === gatheringId);
+    if (!gatheringData) {
+      return;
+    }
+    
+    // If user is host or scribe, treat like card press
+    if (gatheringData.userRole.isHost || gatheringData.userRole.isScribe) {
+      handleGatheringPress(gatheringData);
+      return;
+    }
+    
+    // For regular users, handle RSVP logic
+    if (currentStatus === 'pending') {
+      // Show RSVP options dropdown (existing behavior)
+      return;
+    }
+    
+    // Toggle RSVP status
+    const newStatus = currentStatus === 'yes' ? 'no' : 'yes';
+    updateRSVP(gatheringId, newStatus);
+  };
+
+  // Handle RSVP selection from dropdown
   const handleRSVPSelect = (gatheringId: string, status: 'yes' | 'no') => {
-    console.log('🎯 HomeScreen: handleRSVPSelect called with:', { gatheringId, status });
     updateRSVP(gatheringId, status);
   };
 
@@ -73,15 +89,7 @@ export default function HomeScreen() {
   const transformGatheringData = (cardData: GatheringCardData) => {
     const { gathering, gatheringDisplay, userRole, displayImage, formattedDate, experienceTypeLabel, hostNames, mentorInfo } = cardData;
 
-    // Debug logging for mentor info
-    if (experienceTypeLabel.toLowerCase() === 'mentoring') {
-      console.log('🔄 Transforming mentoring gathering:', gathering.title);
-      console.log('👤 mentorInfo:', mentorInfo);
-      console.log('📝 mentor_satellite:', mentorInfo?.mentor_satellite);
-      console.log('🏢 employer_info:', mentorInfo?.employer_info);
-      console.log('🏷️ mentor_name:', mentorInfo?.mentor_satellite?.full_name);
-      console.log('🏢 mentor_company:', mentorInfo?.employer_info?.name);
-    }
+
 
     return {
       id: gathering.id,
@@ -96,7 +104,7 @@ export default function HomeScreen() {
       mentor_name: mentorInfo?.mentor_satellite?.full_name,
       mentor_company: mentorInfo?.employer_info?.name,
       participant_count: 0, // TODO: Calculate from participation_gatherings
-      max_participants: gatheringDisplay?.cap || 0,
+      max_participants: cardData.gatheringOther?.cap || 0,
       rsvp_status: userRole.rsvpStatus,
       userRole: userRole,
     };
@@ -125,62 +133,64 @@ export default function HomeScreen() {
   }
 
   return (
-    <ScrollView 
-      style={styles.container} 
-      showsVerticalScrollIndicator={false}
-    >
-      <View style={styles.header}>
-        <Text variant="headlineMedium" style={styles.title}>
-          Upcoming Gatherings
-        </Text>
-      </View>
+    <View style={styles.container}>
+      <ScrollView 
+        style={styles.scrollView} 
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.header}>
+          <Text variant="headlineMedium" style={styles.title}>
+            Upcoming Gatherings
+          </Text>
+        </View>
 
-      <View style={styles.section}>
-        {gatherings.length === 0 ? (
-          // No gatherings state
-          <View style={styles.noGatheringsContainer}>
-            <Text style={styles.noGatheringsTitle}>No gatherings on the calendar</Text>
-            <Text style={styles.noGatheringsSubtitle}>
-              Please come back soon or{' '}
-              <TouchableOpacity onPress={handlePlanGathering}>
-                <Text style={styles.planLink}>plan one</Text>
-              </TouchableOpacity>
-            </Text>
-          </View>
-        ) : (
-          <>
-            {/* Gatherings list with expandable functionality */}
-            {getVisibleGatherings().map((gatheringData) => (
-              <GatheringCardCompactV1
-                key={gatheringData.gathering.id}
-                gathering={transformGatheringData(gatheringData)}
-                onPress={() => handleGatheringPress(gatheringData.gathering.id)}
-                onRSVPPress={() => handleRSVPPress(
-                  gatheringData.gathering.id,
-                  gatheringData.userRole.rsvpStatus
-                )}
-                onRSVPSelect={(status) => handleRSVPSelect(gatheringData.gathering.id, status)}
-              />
-            ))}
+        <View style={styles.section}>
+          {gatherings.length === 0 ? (
+            // No gatherings state
+            <View style={styles.noGatheringsContainer}>
+              <Text style={styles.noGatheringsTitle}>No gatherings on the calendar</Text>
+              <Text style={styles.noGatheringsSubtitle}>
+                Please come back soon or{' '}
+                <TouchableOpacity onPress={handlePlanGathering}>
+                  <Text style={styles.planLink}>plan one</Text>
+                </TouchableOpacity>
+              </Text>
+            </View>
+          ) : (
+            <>
+              {/* Gatherings list with expandable functionality */}
+              {getVisibleGatherings().map((gatheringData) => (
+                <GatheringCardCompactV1
+                  key={gatheringData.gathering.id}
+                  gathering={transformGatheringData(gatheringData)}
+                  onPress={() => handleGatheringPress(gatheringData)}
+                  onRSVPPress={() => handleRSVPPress(
+                    gatheringData.gathering.id,
+                    gatheringData.userRole.rsvpStatus
+                  )}
+                  onRSVPSelect={(status) => handleRSVPSelect(gatheringData.gathering.id, status)}
+                />
+              ))}
 
-            {/* Show More/Show Less toggle button */}
-            {shouldShowToggle() && (
-              <TouchableOpacity 
-                style={styles.toggleButton} 
-                onPress={handleToggleExpansion}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.toggleButtonText}>
-                  {isExpanded ? 'Show Fewer' : 'Show More'}
-                </Text>
-              </TouchableOpacity>
-            )}
-          </>
-        )}
-      </View>
+              {/* Show More/Show Less toggle button */}
+              {shouldShowToggle() && (
+                <TouchableOpacity 
+                  style={styles.toggleButton} 
+                  onPress={handleToggleExpansion}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.toggleButtonText}>
+                    {isExpanded ? 'Show Fewer' : 'Show More'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </>
+          )}
+        </View>
 
-      <View style={styles.footer} />
-    </ScrollView>
+        <View style={styles.footer} />
+      </ScrollView>
+    </View>
   );
 }
 
@@ -188,6 +198,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background.primary,
+  },
+  scrollView: {
+    flex: 1,
   },
   header: {
     paddingTop: theme.spacing.lg,
@@ -217,7 +230,7 @@ const styles = StyleSheet.create({
     color: theme.colors.text.secondary,
   },
   errorText: {
-    color: theme.colors.error,
+    color: theme.colors.status.error,
     textAlign: 'center',
     marginBottom: theme.spacing.md,
   },

@@ -22,8 +22,6 @@ export default function EventOrgScreen() {
 
   return (
     <View style={styles.container}>
-      <Text variant="headlineLarge" style={styles.title}>Event Organization</Text>
-      
       <FacebookTopNavTabs
         value={selectedTab}
         onValueChange={setSelectedTab}
@@ -46,12 +44,8 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background.primary,
-    padding: theme.spacing.lg,
-  },
-  title: {
-    color: theme.colors.text.primary,
-    textAlign: 'center',
-    marginBottom: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.lg,
+    paddingTop: theme.spacing.md,
   },
   segmentedButtons: {
     marginBottom: theme.spacing.lg,

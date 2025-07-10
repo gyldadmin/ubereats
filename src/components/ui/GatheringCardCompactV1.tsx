@@ -161,10 +161,10 @@ export default function GatheringCardCompactV1({ gathering, onPress, onRSVPPress
                 <Text variant="bodySmall" style={styles.dateTypeText}>
                   {dateAndType}
                 </Text>
-                {/* RSVP with background shading - interactive if not host/scribe */}
+                {/* RSVP with background shading - interactive for all users */}
                 <TouchableOpacity 
                   onPress={handleRSVPPress}
-                  disabled={!onRSVPPress && !onRSVPSelect || gathering.userRole?.isHost || gathering.userRole?.isScribe}
+                  disabled={!onRSVPPress && !onRSVPSelect}
                   activeOpacity={0.7}
                 >
                   <View style={[styles.rsvpContainer, { backgroundColor: rsvpInfo.bgColor }]}>
@@ -252,7 +252,6 @@ export default function GatheringCardCompactV1({ gathering, onPress, onRSVPPress
                 <TouchableOpacity 
                   style={styles.confirmButton}
                   onPress={() => {
-                    console.log('🎯 Confirmation: Got it button pressed - closing modal');
                     setShowConfirmation(false);
                     setShowRSVPDropdown(false);
                   }}

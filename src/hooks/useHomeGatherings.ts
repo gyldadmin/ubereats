@@ -69,7 +69,7 @@ export interface GatheringWithJoins {
   };
   experience_type?: {
     label: string;
-    image?: string;
+    image_square?: string;
   };
   gyld?: string[];
   host?: string[];
@@ -229,7 +229,7 @@ export const useHomeGatherings = () => {
         .select(`
           *,
           gathering_status!inner(label),
-          experience_type(label, image),
+          experience_type(label, image_square),
           gathering_displays!inner(*),
           gathering_other!inner(*)
         `)
@@ -319,7 +319,7 @@ export const useHomeGatherings = () => {
           const displayImage = await resolveDisplayImage(
             gatheringDisplay || {},
             mentorInfo,
-            gathering.experience_type?.image,
+            gathering.experience_type?.image_square,
             gathering.experience_type?.label
           );
 

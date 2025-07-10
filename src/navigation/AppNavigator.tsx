@@ -1,57 +1,146 @@
 ﻿import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { createStackNavigator } from '@react-navigation/stack';
+import { createStackNavigator, CardStyleInterpolators } from '@react-navigation/stack';
 import { Feather } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BRAND_COLOR } from '../constants';
 import { useAuthStore } from '../stores';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { Text } from 'react-native-paper';
+import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 
 // Import the screens
 import { HomeScreen, RolesScreen, GyldScreen, YouScreen } from '../screens';
 import { SignInScreen, SignUpScreen, OnboardingScreen } from '../screens/auth';
+import { EventOrgScreen, EventDetailScreen } from '../screens/home/events';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
 
+// Helper function to determine if tab bar should be visible
+function getTabBarVisibility(route: any): boolean {
+  // Get the currently focused route name from the nested navigation state
+  const routeName = getFocusedRouteNameFromRoute(route) ?? 'HomeMain';
+  
+  // Hide tab bar on EventOrg and EventDetail screens
+  if (routeName === 'EventOrg' || routeName === 'EventDetail') {
+    return false;
+  }
+  
+  return true;
+}
+
+// Custom back button component
+function CustomBackButton({ navigation }: { navigation: any }) {
+  return (
+    <TouchableOpacity
+      onPress={() => navigation.goBack()}
+      style={{
+        marginLeft: 16,
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: '#f3f4f6', // Light gray background
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <Feather name="arrow-left" size={18} color="#000" />
+    </TouchableOpacity>
+  );
+}
+
+// Home stack navigator for gathering navigation
+function HomeStack() {
+  return (
+    <Stack.Navigator
+      screenOptions={({ navigation }) => ({
+        headerStyle: {
+          backgroundColor: '#fff',
+          elevation: 0,
+          shadowOpacity: 0,
+          height: 44, // Set explicit header height
+        },
+        headerTintColor: BRAND_COLOR,
+        headerTitleStyle: {
+          fontWeight: '600',
+        },
+        headerBackTitleVisible: false,
+        headerLeft: () => <CustomBackButton navigation={navigation} />,
+        cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
+        headerStatusBarHeight: 0, // Remove status bar height from header
+      })}
+    >
+      <Stack.Screen 
+        name="HomeMain" 
+        component={HomeScreen} 
+        options={{ 
+          headerShown: false,
+          title: 'Home'
+        }}
+      />
+      <Stack.Screen 
+        name="EventOrg" 
+        component={EventOrgScreen} 
+        options={{ 
+          title: 'Home',
+          headerShown: true,
+        }}
+      />
+      <Stack.Screen 
+        name="EventDetail" 
+        component={EventDetailScreen} 
+        options={{ 
+          title: '',
+          headerShown: true,
+        }}
+      />
+    </Stack.Navigator>
+  );
+}
+
 // Main app tabs (shown when authenticated)
 function MainTabs() {
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
-      <Tab.Navigator
-        id="MainTabs"
-        screenOptions={({ route }) => ({
-          tabBarIcon: ({ focused, color, size }) => {
-            let iconName;
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        tabBarIcon: ({ focused, color, size }) => {
+          let iconName;
 
-            if (route.name === 'Home') {
-              iconName = 'home';
-            } else if (route.name === 'Roles') {
-              iconName = 'award';
-            } else if (route.name === 'Gyld') {
-              iconName = 'users';
-            } else if (route.name === 'You') {
-              iconName = 'user';
-            }
+          if (route.name === 'Home') {
+            iconName = 'home';
+          } else if (route.name === 'Roles') {
+            iconName = 'award';
+          } else if (route.name === 'Gyld') {
+            iconName = 'users';
+          } else if (route.name === 'You') {
+            iconName = 'user';
+          }
 
-            return <Feather name={iconName} size={size} color={color} />;
+          return <Feather name={iconName} size={size} color={color} />;
+        },
+        tabBarActiveTintColor: BRAND_COLOR,
+        tabBarInactiveTintColor: 'gray',
+        tabBarLabelStyle: {
+          fontSize: 12, // Slightly bigger than default (11px)
+          fontWeight: '500',
+        },
+        headerShown: false,
+      })}
+    >
+      <Tab.Screen 
+        name="Home" 
+        component={HomeStack} 
+        options={({ route }) => ({
+          tabBarStyle: {
+            display: getTabBarVisibility(route) ? 'flex' : 'none',
           },
-          tabBarActiveTintColor: BRAND_COLOR,
-          tabBarInactiveTintColor: 'gray',
-          tabBarLabelStyle: {
-            fontSize: 12, // Slightly bigger than default (11px)
-            fontWeight: '500',
-          },
-          headerShown: false,
         })}
-      >
-        <Tab.Screen name="Home" component={HomeScreen} />
-        <Tab.Screen name="Roles" component={RolesScreen} />
-        <Tab.Screen name="Gyld" component={GyldScreen} />
-        <Tab.Screen name="You" component={YouScreen} />
-      </Tab.Navigator>
-    </SafeAreaView>
+      />
+      <Tab.Screen name="Roles" component={RolesScreen} />
+      <Tab.Screen name="Gyld" component={GyldScreen} />
+      <Tab.Screen name="You" component={YouScreen} />
+    </Tab.Navigator>
   );
 }
 
@@ -64,7 +153,6 @@ function AuthStack({ hasLoggedInBefore }: { hasLoggedInBefore: boolean }) {
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <Stack.Navigator 
-        id="AuthStack"
         screenOptions={{ headerShown: false }}
         initialRouteName={initialRouteName}
       >
@@ -97,7 +185,11 @@ export default function AppNavigator() {
 
   // Show main app if authenticated
   if (user) {
-    return <MainTabs />;
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <MainTabs />
+      </SafeAreaView>
+    );
   }
 
   // Show auth screens based on whether user has logged in before
