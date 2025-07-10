@@ -98,22 +98,67 @@ export default function EventDetailScreen() {
     return { date, time };
   };
 
-  const getLocationInfo = () => {
-    if (gatheringDetail.gatheringOther.remote) {
-      return {
-        type: 'remote',
-        icon: 'videocam' as const,
-        text: 'Virtual Event',
-        subtext: null
-      };
+  // Helper function to truncate mentor bio for preview
+  const truncateBio = (bio: string, wordLimit: number = 30): { truncated: string; needsMore: boolean } => {
+    const words = bio.split(' ');
+    if (words.length <= wordLimit) {
+      return { truncated: bio, needsMore: false };
     }
-    
-    return {
-      type: 'in-person',
-      icon: 'location' as const,
-      text: gatheringDetail.gatheringDisplay?.address || 'Location TBD',
-      subtext: 'In-person event'
+    return { 
+      truncated: words.slice(0, wordLimit).join(' ') + '...', 
+      needsMore: true 
     };
+  };
+
+  // Location display logic with 4 different states
+  const getLocationInfo = () => {
+    const now = new Date();
+    const startTime = gatheringDetail.gathering.start_time ? new Date(gatheringDetail.gathering.start_time) : null;
+    const sixHoursBeforeStart = startTime ? new Date(startTime.getTime() - (6 * 60 * 60 * 1000)) : null;
+    const isWithinSixHours = startTime && now >= sixHoursBeforeStart;
+
+    if (gatheringDetail.gatheringOther.remote) {
+      if (isWithinSixHours) {
+        // State 1: Virtual Event - Less than 6 hours before start
+        return {
+          type: 'remote-ready',
+          icon: 'video' as const,
+          text: 'Virtual Event',
+          subtext: null,
+          showJoinButton: true,
+          meetingLink: gatheringDetail.gatheringDisplay?.meeting_link
+        };
+      } else {
+        // State 2: Virtual Event - More than 6 hours before start
+        return {
+          type: 'remote-waiting',
+          icon: 'video' as const,
+          text: 'Virtual Event',
+          subtext: 'Link available here before event',
+          showJoinButton: false
+        };
+      }
+    } else {
+      if (gatheringDetail.gatheringDisplay?.address) {
+        // State 3: Physical Location - Address provided
+        return {
+          type: 'in-person',
+          icon: 'map-pin' as const,
+          text: gatheringDetail.gatheringDisplay.address,
+          subtext: gatheringDetail.gatheringDisplay?.location_instructions || null,
+          showJoinButton: false
+        };
+      } else {
+        // State 4: Physical Location - Address not provided
+        return {
+          type: 'in-person-tbd',
+          icon: 'map-pin' as const,
+          text: 'Location TBD',
+          subtext: null,
+          showJoinButton: false
+        };
+      }
+    }
   };
 
 
@@ -156,31 +201,15 @@ export default function EventDetailScreen() {
   const location = getLocationInfo();
   const howItWorks = getHowItWorks();
 
-  // Get Attend button state
-  const getAttendButtonProps = () => {
-    switch (rsvpStatus) {
-      case 'yes':
-        return {
-          text: 'You\'re Attending!',
-          style: styles.rsvpYesButton,
-          onPress: () => handleRSVP('no'),
-        };
-      case 'no':
-        return {
-          text: 'Attend',
-          style: styles.rsvpButton,
-          onPress: () => handleRSVP('yes'),
-        };
-      default:
-        return {
-          text: 'Attend',
-          style: styles.rsvpButton,
-          onPress: () => handleRSVP('yes'),
-        };
-    }
+  // Get RSVP button state
+  const getRSVPButtonState = () => {
+    return {
+      status: rsvpStatus,
+      showYesNo: rsvpStatus === 'pending' || !rsvpStatus
+    };
   };
 
-  const attendButtonProps = getAttendButtonProps();
+  const rsvpButtonState = getRSVPButtonState();
 
   return (
     <View style={styles.container}>
@@ -190,16 +219,16 @@ export default function EventDetailScreen() {
           {/* Hero Section */}
           <View style={styles.heroSection}>
             <Image 
-              source={require('../../../../assets/mentoring-session-hero.jpg')}
+              source={{ uri: gatheringDetail.displayImage }}
               style={styles.heroImage}
               resizeMode="cover"
             />
             <View style={styles.heroOverlay}>
               <Text style={styles.heroType}>
-                {gatheringDetail.experienceTypeLabel || 'MENTORING'}
+                {gatheringDetail.experienceTypeLabel?.toUpperCase() || 'EVENT'}
               </Text>
               <Text style={styles.heroTitle}>
-                {gatheringDetail.gathering.title || 'Mentoring Session'}
+                {gatheringDetail.gathering.title || 'Event'}
               </Text>
             </View>
           </View>
@@ -207,6 +236,20 @@ export default function EventDetailScreen() {
 
           {/* Details Section */}
           <Text style={styles.sectionTitleWithSpacing}>Details</Text>
+          
+          {/* Join Now Button for Virtual Events (if within 6 hours) */}
+          {location.showJoinButton && location.meetingLink && (
+            <TouchableOpacity 
+              style={styles.joinButton}
+              onPress={() => {
+                // TODO: Open meeting link
+                console.log('Join meeting:', location.meetingLink);
+              }}
+            >
+              <Text style={styles.joinButtonText}>Join Now</Text>
+            </TouchableOpacity>
+          )}
+          
           <View style={styles.essentialInfo}>
             <View style={styles.infoRow}>
               <Feather name="calendar" size={24} style={styles.infoIcon} />
@@ -217,33 +260,31 @@ export default function EventDetailScreen() {
             </View>
             
             <View style={styles.infoRow}>
-              {location.type === 'remote' ? (
-                <Feather name="video" size={24} style={styles.infoIcon} />
-              ) : (
-                <Feather name="map-pin" size={24} style={styles.infoIcon} />
-              )}
+              <Feather name={location.icon} size={24} style={styles.infoIcon} />
               <View style={styles.infoTextContainer}>
                 <Text style={styles.infoText}>{location.text}</Text>
                 {location.subtext && (
                   <Text style={styles.infoSubtext}>{location.subtext}</Text>
                 )}
-                <Text style={styles.locationDetail}>
-                  Check in at the registration desk and go to the 25th floor
-                </Text>
               </View>
             </View>
             
-            <View style={[styles.infoRow, styles.infoRowLast]}>
-              <Ionicons name="shield-half-sharp" size={24} style={styles.infoIcon} />
-              <View style={styles.infoTextContainer}>
-                <Text style={styles.infoText}>Rep</Text>
-                <Text style={styles.infoSubtext}>Product Market Fit Expansion</Text>
+            {/* Rep Section - only show if learning_topic exists */}
+            {gatheringDetail.gatheringDisplay?.learning_topic && (
+              <View style={[styles.infoRow, styles.infoRowLast]}>
+                <Ionicons name="shield-half-sharp" size={24} style={styles.infoIcon} />
+                <View style={styles.infoTextContainer}>
+                  <Text style={styles.infoText}>Rep</Text>
+                  <Text style={styles.infoSubtext}>
+                    {gatheringDetail.gatheringDisplay.learning_topic?.label || 'Learning Topic'}
+                  </Text>
+                </View>
               </View>
-            </View>
+            )}
           </View>
 
-          {/* Mentor Section */}
-          {(gatheringDetail.hostNames.length > 0 || gatheringDetail.mentorInfo) && (
+          {/* Mentor Section - only show if mentor array is not empty */}
+          {gatheringDetail.gatheringDisplay?.mentor && gatheringDetail.gatheringDisplay.mentor.length > 0 && (
             <View style={styles.mentorSection}>
               <Text style={styles.sectionTitleWithSpacing}>Your Mentor</Text>
               
@@ -266,110 +307,130 @@ export default function EventDetailScreen() {
                 
                 <View style={styles.mentorInfo}>
                   <Text style={styles.mentorName}>
-                    {gatheringDetail.mentorInfo?.mentor_satellite?.full_name || 
-                     gatheringDetail.hostNames[0] || 'Alex Chen'}
+                    {gatheringDetail.mentorInfo?.mentor_satellite?.full_name || 'Mentor Name'}
                   </Text>
                   
-                  <Text style={styles.mentorTitle}>
-                    {gatheringDetail.mentorInfo?.mentor_satellite?.title || 'Senior Product Manager'}
-                  </Text>
+                  {/* Only show title if it exists */}
+                  {gatheringDetail.mentorInfo?.mentor_satellite?.title && (
+                    <Text style={styles.mentorTitle}>
+                      {gatheringDetail.mentorInfo.mentor_satellite.title}
+                    </Text>
+                  )}
                   
-                  <Text style={styles.mentorCompany}>
-                    {gatheringDetail.mentorInfo?.employer_info?.name || 'Airbnb'}
-                  </Text>
+                  {/* Only show company if it exists */}
+                  {gatheringDetail.mentorInfo?.employer_info?.name && (
+                    <Text style={styles.mentorCompany}>
+                      {gatheringDetail.mentorInfo.employer_info.name}
+                    </Text>
+                  )}
                   
-                  <TouchableOpacity 
-                    style={styles.mentorBioLinkContainer}
-                    onPress={() => setShowMentorBioModal(true)}
-                  >
-                    <Text style={styles.mentorBioLink}>Bio</Text>
-                    <Ionicons 
-                      name="chevron-forward" 
-                      size={16} 
-                      color={colors.primary} 
-                    />
-                  </TouchableOpacity>
+                  {/* Only show bio button if bio exists */}
+                  {gatheringDetail.mentorInfo?.mentor_satellite?.bio && (
+                    <TouchableOpacity 
+                      style={styles.mentorBioLinkContainer}
+                      onPress={() => setShowMentorBioModal(true)}
+                    >
+                      <Text style={styles.mentorBioLink}>Bio</Text>
+                      <Ionicons 
+                        name="chevron-forward" 
+                        size={16} 
+                        color={colors.primary} 
+                      />
+                    </TouchableOpacity>
+                  )}
                 </View>
               </View>
             </View>
           )}
 
-          {/* About Section */}
-          <View style={styles.valueSection}>
-            <Text style={styles.sectionTitleWithSpacing}>About</Text>
-            
-            <Text style={styles.description}>
-              {gatheringDetail.gatheringDisplay?.description || 
-              'Join us for an engaging mentoring experience focused on practical insights and career growth. Connect with industry experts and expand your professional network in a supportive environment.'}
-            </Text>
-          </View>
-
-          {/* Attendees Section */}
-          <View style={styles.attendeesSection}>
-            <Text style={styles.sectionTitleWithSpacing}>Attending</Text>
-            
-            <View style={styles.attendeesGrid}>
-              {attendees
-                .filter(attendee => attendee.part_gath_status?.label === 'yes')
-                .slice(0, 5)
-                .map((attendee) => (
-                <View key={attendee.id} style={styles.attendeeItem}>
-                  {attendee.user_profile?.profpic ? (
-                    <Image 
-                      source={{ uri: attendee.user_profile.profpic }}
-                      style={styles.attendeeAvatar}
-                    />
-                  ) : (
-                    <View style={[styles.attendeeAvatar, { backgroundColor: colors.background.tertiary, alignItems: 'center', justifyContent: 'center' }]}>
-                      <Ionicons name="person" size={24} color={colors.text.tertiary} />
-                    </View>
-                  )}
-                  <Text style={styles.attendeeName}>
-                    {attendee.user_profile?.full_name?.split(' ')[0] || 'Anonymous'}
-                  </Text>
-                </View>
-              ))}
+          {/* About Section - only show if description exists */}
+          {gatheringDetail.gatheringDisplay?.description && (
+            <View style={styles.valueSection}>
+              <Text style={styles.sectionTitleWithSpacing}>About</Text>
               
-              {attendeeCounts.yes > 5 && (
-                <View style={styles.attendeeItem}>
-                  <View style={styles.attendeeMore}>
-                    <Text style={styles.attendeeMoreText}>+{attendeeCounts.yes - 5}</Text>
-                  </View>
-                  <Text style={styles.attendeeName}>more</Text>
-                </View>
-              )}
+              <Text style={styles.description}>
+                {gatheringDetail.gatheringDisplay.description}
+              </Text>
             </View>
-          </View>
+          )}
 
-          {/* How It Works Section */}
-          <View style={styles.howItWorksSection}>
-            <Text style={styles.sectionTitleWithSpacing}>How Mentoring Sessions Work</Text>
-            <Text style={styles.howItWorksDescription}>
-              Join us for an engaging mentoring experience focused on practical insights and career growth. 
-              Connect with industry experts and expand your professional network in a supportive environment.
-            </Text>
-            <TouchableOpacity 
-              style={styles.learnMoreButton}
-              onPress={() => setShowHowItWorksModal(true)}
-            >
-              <Text style={styles.learnMoreText}>Learn More</Text>
-              <Ionicons 
-                name="chevron-forward" 
-                size={16} 
-                color={colors.primary} 
-              />
-            </TouchableOpacity>
-          </View>
+          {/* Attendees Section - only show if 4 or more people attending */}
+          {attendeeCounts.yes >= 4 && (
+            <View style={styles.attendeesSection}>
+              <Text style={styles.sectionTitleWithSpacing}>Attending</Text>
+              
+              <View style={styles.attendeesGrid}>
+                {attendees
+                  .filter(attendee => attendee.part_gath_status?.label === 'yes')
+                  .slice(0, 5)
+                  .map((attendee) => (
+                  <View key={attendee.id} style={styles.attendeeItem}>
+                    {attendee.user_profile?.profpic ? (
+                      <Image 
+                        source={{ uri: attendee.user_profile.profpic }}
+                        style={styles.attendeeAvatar}
+                      />
+                    ) : (
+                      <View style={[styles.attendeeAvatar, { backgroundColor: colors.background.tertiary, alignItems: 'center', justifyContent: 'center' }]}>
+                        <Ionicons name="person" size={24} color={colors.text.tertiary} />
+                      </View>
+                    )}
+                    <Text style={styles.attendeeName}>
+                      {attendee.user_profile?.first || 'Anonymous'}
+                    </Text>
+                  </View>
+                ))}
+                
+                {attendeeCounts.yes > 5 && (
+                  <View style={styles.attendeeItem}>
+                    <View style={styles.attendeeMore}>
+                      <Text style={styles.attendeeMoreText}>+{attendeeCounts.yes - 5}</Text>
+                    </View>
+                    <Text style={styles.attendeeName}>more</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          )}
 
-          {/* Host Information */}
-          {gatheringDetail.hostNames.length > 0 && (
+          {/* How It Works Section - only show for mentoring */}
+          {gatheringDetail.experienceTypeLabel?.toLowerCase() === 'mentoring' && (
+            <View style={styles.howItWorksSection}>
+              <Text style={styles.sectionTitleWithSpacing}>How Mentoring Sessions Work</Text>
+              <Text style={styles.howItWorksDescription}>
+                Join us for an engaging mentoring experience focused on practical insights and career growth. 
+                Connect with industry experts and expand your professional network in a supportive environment.
+              </Text>
+              <TouchableOpacity 
+                style={styles.learnMoreButton}
+                onPress={() => setShowHowItWorksModal(true)}
+              >
+                <Text style={styles.learnMoreText}>Learn More</Text>
+                <Ionicons 
+                  name="chevron-forward" 
+                  size={16} 
+                  color={colors.primary} 
+                />
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Host Information - only show if hosts exist */}
+          {gatheringDetail.gathering.host && gatheringDetail.gathering.host.length > 0 && (
             <View style={styles.socialSection}>
               <Text style={styles.sectionTitleWithSpacing}>Host</Text>
               
               <View style={styles.hostInfoCard}>
-                <View style={styles.hostCircleAvatar}>
-                  <Ionicons name="person" size={24} color={colors.text.tertiary} />
-                </View>
+                {gatheringDetail.hostData && gatheringDetail.hostData.length > 0 && gatheringDetail.hostData[0].profpic ? (
+                  <Image 
+                    source={{ uri: gatheringDetail.hostData[0].profpic }}
+                    style={styles.hostCircleAvatar}
+                  />
+                ) : (
+                  <View style={styles.hostCircleAvatar}>
+                    <Ionicons name="person" size={24} color={colors.text.tertiary} />
+                  </View>
+                )}
                 <View style={styles.hostTextInfo}>
                   <Text style={styles.hostNameText}>
                     {gatheringDetail.hostNames.join(', ')}
@@ -395,14 +456,44 @@ export default function EventDetailScreen() {
             <Text style={styles.secondaryButtonText}>Share</Text>
           </TouchableOpacity>
           
-          <TouchableOpacity 
-            style={[styles.rsvpButton, attendButtonProps.style]}
-            onPress={attendButtonProps.onPress}
-          >
-            <Text style={styles.rsvpButtonText}>
-              {attendButtonProps.text}
-            </Text>
-          </TouchableOpacity>
+          {/* RSVP Buttons based on status */}
+          {rsvpButtonState.status === 'yes' ? (
+            <TouchableOpacity 
+              style={[styles.rsvpButton, styles.rsvpYesButton]}
+              onPress={() => handleRSVP('no')}
+            >
+              <Text style={styles.rsvpButtonText}>You're Going</Text>
+            </TouchableOpacity>
+          ) : rsvpButtonState.status === 'no' ? (
+            <TouchableOpacity 
+              style={styles.rsvpButton}
+              onPress={() => handleRSVP('yes')}
+            >
+              <Text style={styles.rsvpButtonText}>You're Not Going</Text>
+            </TouchableOpacity>
+          ) : rsvpButtonState.showYesNo ? (
+            <>
+              <TouchableOpacity 
+                style={styles.rsvpButton}
+                onPress={() => handleRSVP('yes')}
+              >
+                <Text style={styles.rsvpButtonText}>Yes</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.secondaryButton}
+                onPress={() => handleRSVP('no')}
+              >
+                <Text style={styles.secondaryButtonText}>No</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <TouchableOpacity 
+              style={styles.rsvpButton}
+              onPress={() => handleRSVP('yes')}
+            >
+              <Text style={styles.rsvpButtonText}>RSVP</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
       
@@ -416,7 +507,7 @@ export default function EventDetailScreen() {
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>
-              {gatheringDetail?.mentorInfo?.mentor_satellite?.full_name || 'Alex Chen'}
+              {gatheringDetail?.mentorInfo?.mentor_satellite?.full_name || 'Mentor'}
             </Text>
             <TouchableOpacity 
               onPress={() => setShowMentorBioModal(false)}
@@ -427,11 +518,7 @@ export default function EventDetailScreen() {
           </View>
           <ScrollView style={styles.modalContent}>
             <Text style={styles.modalText}>
-              With over 10 years of experience in product management and leadership, 
-              our mentor has successfully launched products that have reached millions of users. 
-              They specialize in product-market fit, growth strategies, and building high-performing teams. 
-              Previously at top tech companies, they're passionate about sharing insights and helping 
-              the next generation of product professionals.
+              {gatheringDetail?.mentorInfo?.mentor_satellite?.bio || 'Mentor bio not available.'}
             </Text>
           </ScrollView>
         </View>
@@ -532,6 +619,19 @@ const styles = StyleSheet.create({
     borderRadius: spacing.md,
     padding: spacing.lg,
     marginBottom: spacing.lg,
+  },
+  joinButton: {
+    backgroundColor: colors.primary,
+    borderRadius: spacing.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  joinButtonText: {
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.semibold,
+    color: colors.text.inverse,
   },
   infoRow: {
     flexDirection: 'row',

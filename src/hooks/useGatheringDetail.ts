@@ -14,6 +14,7 @@ export interface AttendeeInfo {
   // User profile information
   user_profile?: {
     full_name: string;
+    first: string;
     profpic?: string;
   };
   created_at: string;
@@ -32,6 +33,8 @@ export interface GatheringDetailData extends Omit<GatheringCardData, 'userPartic
     pending: number;
     total: number;
   };
+  // Host data (names and photos)
+  hostData: Array<{full_name: string, profpic?: string}>;
 }
 
 /**
@@ -122,20 +125,20 @@ export const useGatheringDetail = (gatheringId: string) => {
     return defaultImage;
   };
 
-  // Get host names from user IDs
-  const getHostNames = async (hostIds: string[]): Promise<string[]> => {
+  // Get host data (names and photos) from user IDs
+  const getHostData = async (hostIds: string[]): Promise<Array<{full_name: string, profpic?: string}>> => {
     if (!hostIds || hostIds.length === 0) return [];
     
     try {
       const { data, error } = await supabase
         .from('users_public')
-        .select('full_name')
+        .select('full_name, profpic')
         .in('user_id', hostIds);
       
       if (error) throw error;
-      return data?.map(user => user.full_name).filter(Boolean) || [];
+      return data?.filter(user => user.full_name) || [];
     } catch (err) {
-      console.error('Error fetching host names:', err);
+      console.error('Error fetching host data:', err);
       return [];
     }
   };
@@ -157,8 +160,8 @@ export const useGatheringDetail = (gatheringId: string) => {
         .select(`
           *,
           gathering_status!inner(label),
-          experience_type(label, image_square),
-          gathering_displays!inner(*),
+          experience_type(label, image_horizontal),
+          gathering_displays!inner(*, learning_topic(label)),
           gathering_other!inner(*)
         `)
         .eq('id', gatheringId)
@@ -217,7 +220,7 @@ export const useGatheringDetail = (gatheringId: string) => {
         
         const { data: userProfiles, error: profilesError } = await supabase
           .from('users_public')
-          .select('user_id, full_name, profpic')
+          .select('user_id, full_name, first, profpic')
           .in('user_id', userIds);
 
         if (profilesError) {
@@ -234,6 +237,7 @@ export const useGatheringDetail = (gatheringId: string) => {
             part_gath_status: attendee.part_gath_status,
             user_profile: userProfile ? {
               full_name: userProfile.full_name,
+              first: userProfile.first,
               profpic: userProfile.profpic
             } : undefined,
             created_at: attendee.created_at
@@ -263,16 +267,12 @@ export const useGatheringDetail = (gatheringId: string) => {
         rsvpStatus = 'no';
       }
 
-      // Get host names
-      const hostNames = await getHostNames(gatheringData.host || []);
+      // Get host data (names and photos)
+      const hostData = await getHostData(gatheringData.host || []);
+      const hostNames = hostData.map(host => host.full_name);
 
-      // Resolve display image with validation
-      const displayImage = await resolveDisplayImage(
-        gatheringDisplay || {},
-        mentorInfo,
-        gatheringData.experience_type?.image_square,
-        gatheringData.experience_type?.label
-      );
+      // Use horizontal image from experience type (no fallback logic per plan)
+      const displayImage = gatheringData.experience_type?.image_horizontal || 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=800&h=400&fit=crop';
 
       // Build comprehensive detail data object
       const detailData: GatheringDetailData = {
@@ -303,7 +303,8 @@ export const useGatheringDetail = (gatheringId: string) => {
         displayImage,
         formattedDate: gatheringData.start_time ? formatDate(gatheringData.start_time) : '',
         experienceTypeLabel: gatheringData.experience_type?.label || '',
-        hostNames
+        hostNames,
+        hostData
       };
 
       setGatheringDetail(detailData);

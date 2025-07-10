@@ -13,7 +13,9 @@ export interface GatheringDisplay {
   meeting_link?: string;
   location_instructions?: string;
   mentor?: string[];
-  learning_topic?: string;
+  learning_topic?: {
+    label: string;
+  };
 }
 
 export interface GatheringOther {
@@ -42,6 +44,7 @@ export interface MentorInfo {
     full_name: string;
     profpic?: string;
     title?: string;
+    bio?: string;
   };
   employer_info?: {
     name?: string;
