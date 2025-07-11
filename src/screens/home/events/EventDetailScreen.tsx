@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, Text, TouchableOpacity, Image, Modal } from 'react-native';
+import { View, StyleSheet, ScrollView, Text, TouchableOpacity, Image, Modal, Linking } from 'react-native';
 import { useRoute } from '@react-navigation/native';
+import { useContent } from '../../../hooks/useContent';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, layout, shadows, theme, typography } from '../../../styles';
@@ -34,6 +35,42 @@ export default function EventDetailScreen() {
   // State for modal sliders
   const [showMentorBioModal, setShowMentorBioModal] = useState(false);
   const [showHowItWorksModal, setShowHowItWorksModal] = useState(false);
+  const [showAllAttendeesModal, setShowAllAttendeesModal] = useState(false);
+  
+  // Track failed image loads
+  const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
+  
+  // Get mentoring content
+  const mentoringContent = useContent('mentoring_how_it_works');
+  
+  // Debug what we're getting from useContent
+  console.log('🎯 EventDetailScreen mentoringContent:', mentoringContent);
+  
+  // Temporary debug section - we'll remove this after testing
+  const debugContentRendering = () => {
+    if (!mentoringContent) {
+      return (
+        <View style={{ backgroundColor: 'red', padding: 10, margin: 10 }}>
+          <Text style={{ color: 'white' }}>❌ mentoringContent is null/undefined</Text>
+        </View>
+      );
+    }
+    
+    return (
+      <View style={{ backgroundColor: 'green', padding: 10, margin: 10 }}>
+        <Text style={{ color: 'white' }}>✅ mentoringContent loaded!</Text>
+        <Text style={{ color: 'white' }}>Description: {mentoringContent.description?.substring(0, 50)}...</Text>
+        <Text style={{ color: 'white' }}>Content: {mentoringContent.content?.substring(0, 50)}...</Text>
+      </View>
+    );
+  };
+  
+  // Debug logging to understand what's happening
+  console.log('🔍 EventDetailScreen Debug:', {
+    mentoringContent,
+    hasDescription: !!mentoringContent?.description,
+    hasContent: !!mentoringContent?.content
+  });
 
   // Loading state
   if (loading) {
@@ -96,6 +133,16 @@ export default function EventDetailScreen() {
     const time = endTimeStr ? `${startTimeStr} - ${endTimeStr}` : startTimeStr;
     
     return { date, time };
+  };
+
+  // Image error handling
+  const handleImageError = (imageUrl: string) => {
+    setFailedImages(prev => new Set(prev).add(imageUrl));
+  };
+
+  // Check if image should show placeholder
+  const shouldShowPlaceholder = (imageUrl?: string) => {
+    return !imageUrl || failedImages.has(imageUrl);
   };
 
   // Helper function to truncate mentor bio for preview
@@ -213,6 +260,9 @@ export default function EventDetailScreen() {
 
   return (
     <View style={styles.container}>
+      {/* Debug Section - Remove after testing */}
+      {debugContentRendering()}
+      
       {/* Scrollable Content */}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.scrollContent}>
@@ -234,21 +284,21 @@ export default function EventDetailScreen() {
           </View>
 
 
-          {/* Details Section */}
-          <Text style={styles.sectionTitleWithSpacing}>Details</Text>
-          
           {/* Join Now Button for Virtual Events (if within 6 hours) */}
           {location.showJoinButton && location.meetingLink && (
             <TouchableOpacity 
               style={styles.joinButton}
               onPress={() => {
-                // TODO: Open meeting link
-                console.log('Join meeting:', location.meetingLink);
+                // Open meeting link
+                Linking.openURL(location.meetingLink);
               }}
             >
               <Text style={styles.joinButtonText}>Join Now</Text>
             </TouchableOpacity>
           )}
+
+          {/* Details Section */}
+          <Text style={styles.sectionTitleWithSpacing}>Details</Text>
           
           <View style={styles.essentialInfo}>
             <View style={styles.infoRow}>
@@ -259,7 +309,11 @@ export default function EventDetailScreen() {
               </View>
             </View>
             
-            <View style={styles.infoRow}>
+            <View style={[
+              styles.infoRow,
+              // Remove bottom margin if this is the last row (Rep section is hidden)
+              !gatheringDetail.gatheringDisplay?.learning_topic && styles.infoRowLast
+            ]}>
               <Feather name={location.icon} size={24} style={styles.infoIcon} />
               <View style={styles.infoTextContainer}>
                 <Text style={styles.infoText}>{location.text}</Text>
@@ -272,7 +326,14 @@ export default function EventDetailScreen() {
             {/* Rep Section - only show if learning_topic exists */}
             {gatheringDetail.gatheringDisplay?.learning_topic && (
               <View style={[styles.infoRow, styles.infoRowLast]}>
-                <Ionicons name="shield-half-sharp" size={24} style={styles.infoIcon} />
+                <Ionicons 
+                  name="shield-half-sharp" 
+                  size={24} 
+                  style={[
+                    styles.infoIcon,
+                    { color: gatheringDetail.gatheringDisplay.learning_topic?.color || '#000000' }
+                  ]} 
+                />
                 <View style={styles.infoTextContainer}>
                   <Text style={styles.infoText}>Rep</Text>
                   <Text style={styles.infoSubtext}>
@@ -306,40 +367,49 @@ export default function EventDetailScreen() {
                 )}
                 
                 <View style={styles.mentorInfo}>
-                  <Text style={styles.mentorName}>
-                    {gatheringDetail.mentorInfo?.mentor_satellite?.full_name || 'Mentor Name'}
-                  </Text>
-                  
-                  {/* Only show title if it exists */}
-                  {gatheringDetail.mentorInfo?.mentor_satellite?.title && (
-                    <Text style={styles.mentorTitle}>
-                      {gatheringDetail.mentorInfo.mentor_satellite.title}
+                  <View style={styles.mentorTextContainer}>
+                    <Text style={styles.mentorName}>
+                      {gatheringDetail.mentorInfo?.mentor_satellite?.full_name || 'Mentor Name'}
                     </Text>
-                  )}
-                  
-                  {/* Only show company if it exists */}
-                  {gatheringDetail.mentorInfo?.employer_info?.name && (
-                    <Text style={styles.mentorCompany}>
-                      {gatheringDetail.mentorInfo.employer_info.name}
-                    </Text>
-                  )}
-                  
-                  {/* Only show bio button if bio exists */}
-                  {gatheringDetail.mentorInfo?.mentor_satellite?.bio && (
-                    <TouchableOpacity 
-                      style={styles.mentorBioLinkContainer}
-                      onPress={() => setShowMentorBioModal(true)}
-                    >
-                      <Text style={styles.mentorBioLink}>Bio</Text>
-                      <Ionicons 
-                        name="chevron-forward" 
-                        size={16} 
-                        color={colors.primary} 
-                      />
-                    </TouchableOpacity>
-                  )}
+                    
+                    {/* Only show title if it exists */}
+                    {gatheringDetail.mentorInfo?.mentor_satellite?.title && (
+                      <Text style={styles.mentorTitle}>
+                        {gatheringDetail.mentorInfo.mentor_satellite.title}
+                      </Text>
+                    )}
+                    
+                    {/* Only show company if it exists */}
+                    {gatheringDetail.mentorInfo?.employer_info?.name && (
+                      <Text style={styles.mentorCompany}>
+                        {gatheringDetail.mentorInfo.employer_info.name}
+                      </Text>
+                    )}
+                    
+                    {/* Show nonprofit text if nonprofit_name exists */}
+                    {gatheringDetail.mentorInfo?.mentor_satellite?.nonprofit_name && (
+                      <Text style={styles.mentorNonprofit}>
+                        Mentoring for {gatheringDetail.mentorInfo.mentor_satellite.nonprofit_name}
+                      </Text>
+                    )}
+                  </View>
                 </View>
               </View>
+              
+              {/* Bio link moved below the photo with Learn More format */}
+              {gatheringDetail.mentorInfo?.mentor_satellite?.bio && (
+                <TouchableOpacity 
+                  style={styles.learnMoreButton}
+                  onPress={() => setShowMentorBioModal(true)}
+                >
+                  <Text style={styles.learnMoreText}>Bio</Text>
+                  <Ionicons 
+                    name="chevron-forward" 
+                    size={16} 
+                    color={colors.primary} 
+                  />
+                </TouchableOpacity>
+              )}
             </View>
           )}
 
@@ -362,16 +432,17 @@ export default function EventDetailScreen() {
               <View style={styles.attendeesGrid}>
                 {attendees
                   .filter(attendee => attendee.part_gath_status?.label === 'yes')
-                  .slice(0, 5)
+                  .slice(0, 9)
                   .map((attendee) => (
                   <View key={attendee.id} style={styles.attendeeItem}>
-                    {attendee.user_profile?.profpic ? (
+                    {!shouldShowPlaceholder(attendee.user_profile?.profpic) ? (
                       <Image 
-                        source={{ uri: attendee.user_profile.profpic }}
+                        source={{ uri: attendee.user_profile!.profpic }}
                         style={styles.attendeeAvatar}
+                        onError={() => handleImageError(attendee.user_profile!.profpic!)}
                       />
                     ) : (
-                      <View style={[styles.attendeeAvatar, { backgroundColor: colors.background.tertiary, alignItems: 'center', justifyContent: 'center' }]}>
+                      <View style={[styles.attendeeAvatar, styles.attendeePlaceholder]}>
                         <Ionicons name="person" size={24} color={colors.text.tertiary} />
                       </View>
                     )}
@@ -381,13 +452,16 @@ export default function EventDetailScreen() {
                   </View>
                 ))}
                 
-                {attendeeCounts.yes > 5 && (
-                  <View style={styles.attendeeItem}>
+                {attendeeCounts.yes > 9 && (
+                  <TouchableOpacity 
+                    style={styles.attendeeItem}
+                    onPress={() => setShowAllAttendeesModal(true)}
+                  >
                     <View style={styles.attendeeMore}>
-                      <Text style={styles.attendeeMoreText}>+{attendeeCounts.yes - 5}</Text>
+                      <Text style={styles.attendeeMoreText}>+{attendeeCounts.yes - 9}</Text>
                     </View>
                     <Text style={styles.attendeeName}>more</Text>
-                  </View>
+                  </TouchableOpacity>
                 )}
               </View>
             </View>
@@ -398,8 +472,7 @@ export default function EventDetailScreen() {
             <View style={styles.howItWorksSection}>
               <Text style={styles.sectionTitleWithSpacing}>How Mentoring Sessions Work</Text>
               <Text style={styles.howItWorksDescription}>
-                Join us for an engaging mentoring experience focused on practical insights and career growth. 
-                Connect with industry experts and expand your professional network in a supportive environment.
+                {mentoringContent?.description || 'Join us for an engaging mentoring experience focused on practical insights and career growth.'}
               </Text>
               <TouchableOpacity 
                 style={styles.learnMoreButton}
@@ -542,17 +615,53 @@ export default function EventDetailScreen() {
             </TouchableOpacity>
           </View>
           <ScrollView style={styles.modalContent}>
-            {getHowItWorks().map((step, index) => (
-              <View key={index} style={styles.modalStep}>
-                <View style={styles.modalStepNumber}>
-                  <Text style={styles.modalStepNumberText}>{index + 1}</Text>
+            <Text style={styles.modalText}>
+              {mentoringContent?.content || getHowItWorks().map((step, index) => `${index + 1}. ${step.title}\n${step.description}`).join('\n\n')}
+            </Text>
+          </ScrollView>
+        </View>
+      </Modal>
+      
+      {/* All Attendees Modal */}
+      <Modal
+        visible={showAllAttendeesModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowAllAttendeesModal(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>All Attendees ({attendeeCounts.yes})</Text>
+            <TouchableOpacity 
+              onPress={() => setShowAllAttendeesModal(false)}
+              style={styles.modalCloseButton}
+            >
+              <Ionicons name="close" size={24} color={colors.text.primary} />
+            </TouchableOpacity>
+          </View>
+          <ScrollView style={styles.modalContent}>
+            <View style={styles.allAttendeesGrid}>
+              {attendees
+                .filter(attendee => attendee.part_gath_status?.label === 'yes')
+                .map((attendee) => (
+                                 <View key={attendee.id} style={styles.modalAttendeeItem}>
+                   {!shouldShowPlaceholder(attendee.user_profile?.profpic) ? (
+                     <Image 
+                       source={{ uri: attendee.user_profile!.profpic }}
+                       style={styles.modalAttendeeAvatar}
+                       onError={() => handleImageError(attendee.user_profile!.profpic!)}
+                     />
+                   ) : (
+                     <View style={[styles.modalAttendeeAvatar, styles.attendeePlaceholder]}>
+                       <Ionicons name="person" size={32} color={colors.text.tertiary} />
+                     </View>
+                   )}
+                  <Text style={styles.modalAttendeeName}>
+                    {attendee.user_profile?.first || 'Anonymous'}
+                  </Text>
                 </View>
-                <View style={styles.modalStepContent}>
-                  <Text style={styles.modalStepTitle}>{step.title}</Text>
-                  <Text style={styles.modalStepDescription}>{step.description}</Text>
-                </View>
-              </View>
-            ))}
+              ))}
+            </View>
           </ScrollView>
         </View>
       </Modal>
@@ -626,6 +735,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
     alignItems: 'center',
+    marginTop: spacing.xl + spacing.sm,
     marginBottom: spacing.md,
   },
   joinButtonText: {
@@ -858,6 +968,11 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     marginBottom: spacing.xs,
   },
+  attendeePlaceholder: {
+    backgroundColor: colors.border.light,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   attendeeName: {
     fontSize: typography.sizes.xs,
     color: colors.text.secondary,
@@ -983,23 +1098,29 @@ const styles = StyleSheet.create({
   mentorInfo: {
     flex: 1,
     justifyContent: 'space-between',
-    height: 100,
+    minHeight: 100, // Match image height as minimum, allow growth
+  },
+  mentorTextContainer: {
+    flex: 1,
+    justifyContent: 'space-between',
+    gap: spacing.xs, // Use gap instead of marginBottom for cleaner spacing
   },
   mentorName: {
     fontSize: typography.sizes.md,
     fontWeight: typography.weights.semibold,
     color: colors.text.primary,
-    marginBottom: spacing.xs,
   },
   mentorTitle: {
     fontSize: typography.sizes.sm,
     color: colors.text.secondary,
-    marginBottom: spacing.xs,
   },
   mentorCompany: {
     fontSize: typography.sizes.sm,
     color: colors.text.tertiary,
-    marginBottom: spacing.xs,
+  },
+  mentorNonprofit: {
+    fontSize: typography.sizes.sm,
+    color: colors.text.secondary,
   },
   mentorBioLink: {
     fontSize: typography.sizes.sm,
@@ -1122,5 +1243,30 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.sm,
     color: colors.text.secondary,
     lineHeight: 20,
+  },
+  
+  // All Attendees Modal Styles
+  allAttendeesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.md,
+    justifyContent: 'flex-start',
+  },
+  modalAttendeeItem: {
+    alignItems: 'center',
+    width: 80,
+    marginBottom: spacing.md,
+  },
+  modalAttendeeAvatar: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    marginBottom: spacing.sm,
+  },
+  modalAttendeeName: {
+    fontSize: typography.sizes.sm,
+    color: colors.text.primary,
+    textAlign: 'center',
+    fontWeight: typography.weights.medium,
   },
 }); 

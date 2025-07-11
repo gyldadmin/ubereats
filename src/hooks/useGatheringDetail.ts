@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { Image } from 'react-native';
 import { supabase } from '../services/supabase';
 import { useAuthStore } from '../stores/authStore';
 import type { GatheringCardData, GatheringDisplay, GatheringOther, MentorInfo, UserParticipation } from './useHomeGatherings';
@@ -45,6 +46,7 @@ export const useGatheringDetail = (gatheringId: string) => {
   const [gatheringDetail, setGatheringDetail] = useState<GatheringDetailData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [imagePreloading, setImagePreloading] = useState(false);
   
   // Get current user info from global state
   const { user, userGyld } = useAuthStore();
@@ -143,6 +145,30 @@ export const useGatheringDetail = (gatheringId: string) => {
     }
   };
 
+  // Preload image for faster display
+  const preloadImage = async (imageUrl: string): Promise<void> => {
+    if (!imageUrl) return;
+    
+    try {
+      setImagePreloading(true);
+      console.log('🚀 Preloading image:', imageUrl);
+      
+      // Preload the image with a timeout to avoid hanging
+      await Promise.race([
+        Image.prefetch(imageUrl),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Image preload timeout')), 3000)
+        )
+      ]);
+      
+      console.log('✅ Image preloaded successfully');
+    } catch (err) {
+      console.log('⚠️ Image preload failed, will load normally:', err);
+    } finally {
+      setImagePreloading(false);
+    }
+  };
+
   // Fetch comprehensive gathering detail data
   const fetchGatheringDetail = useCallback(async () => {
     if (!gatheringId || !user) {
@@ -161,7 +187,7 @@ export const useGatheringDetail = (gatheringId: string) => {
           *,
           gathering_status!inner(label),
           experience_type(label, image_horizontal),
-          gathering_displays!inner(*, learning_topic(label)),
+          gathering_displays!inner(*, learning_topic(label, color)),
           gathering_other!inner(*)
         `)
         .eq('id', gatheringId)
@@ -273,6 +299,9 @@ export const useGatheringDetail = (gatheringId: string) => {
 
       // Use horizontal image from experience type (no fallback logic per plan)
       const displayImage = gatheringData.experience_type?.image_horizontal || 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=800&h=400&fit=crop';
+
+      // Preload the image for faster display
+      await preloadImage(displayImage);
 
       // Build comprehensive detail data object
       const detailData: GatheringDetailData = {
@@ -407,7 +436,7 @@ export const useGatheringDetail = (gatheringId: string) => {
 
   return {
     gatheringDetail,
-    loading,
+    loading: loading || imagePreloading,
     error,
     updateRSVP,
     refresh,
