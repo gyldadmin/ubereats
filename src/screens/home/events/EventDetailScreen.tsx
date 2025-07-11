@@ -43,34 +43,7 @@ export default function EventDetailScreen() {
   // Get mentoring content
   const mentoringContent = useContent('mentoring_how_it_works');
   
-  // Debug what we're getting from useContent
-  console.log('🎯 EventDetailScreen mentoringContent:', mentoringContent);
-  
-  // Temporary debug section - we'll remove this after testing
-  const debugContentRendering = () => {
-    if (!mentoringContent) {
-      return (
-        <View style={{ backgroundColor: 'red', padding: 10, margin: 10 }}>
-          <Text style={{ color: 'white' }}>❌ mentoringContent is null/undefined</Text>
-        </View>
-      );
-    }
-    
-    return (
-      <View style={{ backgroundColor: 'green', padding: 10, margin: 10 }}>
-        <Text style={{ color: 'white' }}>✅ mentoringContent loaded!</Text>
-        <Text style={{ color: 'white' }}>Description: {mentoringContent.description?.substring(0, 50)}...</Text>
-        <Text style={{ color: 'white' }}>Content: {mentoringContent.content?.substring(0, 50)}...</Text>
-      </View>
-    );
-  };
-  
-  // Debug logging to understand what's happening
-  console.log('🔍 EventDetailScreen Debug:', {
-    mentoringContent,
-    hasDescription: !!mentoringContent?.description,
-    hasContent: !!mentoringContent?.content
-  });
+  // Get mentoring content
 
   // Loading state
   if (loading) {
@@ -260,9 +233,6 @@ export default function EventDetailScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Debug Section - Remove after testing */}
-      {debugContentRendering()}
-      
       {/* Scrollable Content */}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.scrollContent}>
