@@ -27,6 +27,11 @@ export const getGyldTypeFocus = (gyldTypeAt?: string): string => {
   }
 };
 
+// Helper function to escape special regex characters
+const escapeRegExp = (string: string): string => {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+};
+
 // Main function to replace all placeholders in content
 export const replaceContentPlaceholders = (
   content: string, 
@@ -46,10 +51,11 @@ export const replaceContentPlaceholders = (
     // Add more placeholders as needed
   };
   
-  // Replace all placeholders
+  // Replace all placeholders using simple string replacement to avoid regex issues
   let processedContent = content;
   Object.entries(replacements).forEach(([placeholder, value]) => {
-    processedContent = processedContent.replace(new RegExp(placeholder, 'g'), value);
+    // Use split and join for safe replacement instead of regex
+    processedContent = processedContent.split(placeholder).join(value);
   });
   
   return processedContent;
