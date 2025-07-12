@@ -12,7 +12,15 @@ import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 // Import the screens
 import { HomeScreen, RolesScreen, GyldScreen, YouScreen } from '../screens';
 import { SignInScreen, SignUpScreen, OnboardingScreen } from '../screens/auth';
-import { EventOrgScreen, EventDetailScreen } from '../screens/home/events';
+import { EventDetailScreen } from '../screens/home/events';
+import { 
+  GatheringSetupScreen, 
+  GatheringManageScreen, 
+  GatheringPromoteScreen, 
+  GatheringResourcesScreen, 
+  MentoringCalendarScreen, 
+  MentorFinderScreen 
+} from '../screens/host';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -22,8 +30,9 @@ function getTabBarVisibility(route: any): boolean {
   // Get the currently focused route name from the nested navigation state
   const routeName = getFocusedRouteNameFromRoute(route) ?? 'HomeMain';
   
-  // Hide tab bar on EventOrg and EventDetail screens
-  if (routeName === 'EventOrg' || routeName === 'EventDetail') {
+  // Hide tab bar on EventDetail and host screens
+  const hostScreens = ['EventDetail', 'GatheringSetup', 'GatheringManage', 'GatheringPromote', 'GatheringResources', 'MentoringCalendar', 'MentorFinder'];
+  if (hostScreens.includes(routeName)) {
     return false;
   }
   
@@ -80,18 +89,58 @@ function HomeStack() {
         }}
       />
       <Stack.Screen 
-        name="EventOrg" 
-        component={EventOrgScreen} 
-        options={{ 
-          title: 'Home',
-          headerShown: true,
-        }}
-      />
-      <Stack.Screen 
         name="EventDetail" 
         component={EventDetailScreen} 
         options={{ 
           title: '',
+          headerShown: true,
+        }}
+      />
+      <Stack.Screen 
+        name="GatheringSetup" 
+        component={GatheringSetupScreen} 
+        options={{ 
+          title: 'Set Up Gathering',
+          headerShown: true,
+        }}
+      />
+      <Stack.Screen 
+        name="GatheringManage" 
+        component={GatheringManageScreen} 
+        options={{ 
+          title: 'Manage Gathering',
+          headerShown: true,
+        }}
+      />
+      <Stack.Screen 
+        name="GatheringPromote" 
+        component={GatheringPromoteScreen} 
+        options={{ 
+          title: 'Promote Gathering',
+          headerShown: true,
+        }}
+      />
+      <Stack.Screen 
+        name="GatheringResources" 
+        component={GatheringResourcesScreen} 
+        options={{ 
+          title: 'Resources',
+          headerShown: true,
+        }}
+      />
+      <Stack.Screen 
+        name="MentoringCalendar" 
+        component={MentoringCalendarScreen} 
+        options={{ 
+          title: 'Mentoring Calendar',
+          headerShown: true,
+        }}
+      />
+      <Stack.Screen 
+        name="MentorFinder" 
+        component={MentorFinderScreen} 
+        options={{ 
+          title: 'Find a Mentor',
           headerShown: true,
         }}
       />

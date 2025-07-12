@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView, Text, TouchableOpacity, Image, Modal, Linking } from 'react-native';
+import { TextInput } from 'react-native-paper';
 import { useRoute } from '@react-navigation/native';
-import { useContent } from '../../../hooks/useContent';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, spacing, layout, shadows, theme, typography } from '../../../styles';
-import { useGatheringDetail } from '../../../hooks';
+import { colors, spacing, layout, shadows, theme, typography, globalStyles } from '../../../styles';
+import { useGatheringDetail, useContentTemplate } from '../../../hooks';
+import { ContentTemplateDisplay } from '../../../components/ui';
+import { useAuthStore } from '../../../stores/authStore';
+import { supabase } from '../../../services/supabase';
 import type { GatheringCardData } from '../../../hooks/useHomeGatherings';
 
 interface EventDetailScreenRouteParams {
@@ -35,15 +38,131 @@ export default function EventDetailScreen() {
   // State for modal sliders
   const [showMentorBioModal, setShowMentorBioModal] = useState(false);
   const [showHowItWorksModal, setShowHowItWorksModal] = useState(false);
+  const [showScribeRoleModal, setShowScribeRoleModal] = useState(false);
   const [showAllAttendeesModal, setShowAllAttendeesModal] = useState(false);
+  const [showRSVPConfirmation, setShowRSVPConfirmation] = useState(false);
+  const [showPotluckModal, setShowPotluckModal] = useState(false);
   
   // Track failed image loads
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
   
-  // Get mentoring content
-  const mentoringContent = useContent('mentoring_how_it_works');
+  // State for user's gyld type @ field
+  const [userGyldTypeSymbol, setUserGyldTypeSymbol] = useState<string>('');
   
-  // Get mentoring content
+  // Potluck state
+  const [potluckData, setPotluckData] = useState<Array<{id: string, user_name: string, contribution: string}>>([]);
+  const [potluckContribution, setPotluckContribution] = useState<string>('');
+  const [potluckLoading, setPotluckLoading] = useState(false);
+  const [showPotluckSuccess, setShowPotluckSuccess] = useState(false);
+  
+  // Get current user's gyld from auth store
+  const { userGyld, user } = useAuthStore();
+
+  // Fetch user's gyld type @ field
+  React.useEffect(() => {
+    const fetchUserGyldType = async () => {
+      if (!userGyld) {
+        console.log('No userGyld found, skipping gyld type fetch');
+        return;
+      }
+      
+      try {
+        console.log('Fetching gyld type for userGyld:', userGyld);
+        
+        // First get the gyld record to get the gyld_type ID
+        const { data: gyldData, error: gyldError } = await supabase
+          .from('gyld')
+          .select('*')
+          .eq('id', userGyld)
+          .single();
+
+        if (gyldError) {
+          console.error('Error fetching gyld:', gyldError);
+          return;
+        }
+
+        console.log('Gyld data:', gyldData);
+
+        if (!gyldData?.gyld_type || gyldData.gyld_type.length === 0) {
+          console.log('No gyld_type found in gyld data, using fallback');
+          // Fallback: try to derive from gyld name or use default
+          const gyldName = gyldData.name?.toLowerCase() || '';
+          let fallbackSymbol = '';
+          
+          if (gyldName.includes('product')) {
+            fallbackSymbol = 'product management';
+          } else if (gyldName.includes('engineering') || gyldName.includes('tech')) {
+            fallbackSymbol = 'engineering';
+          } else if (gyldName.includes('design')) {
+            fallbackSymbol = 'design';
+          } else if (gyldName.includes('marketing')) {
+            fallbackSymbol = 'marketing';
+          } else {
+            fallbackSymbol = 'mentoring'; // Default fallback
+          }
+          
+          console.log('Using fallback gyld type symbol:', fallbackSymbol);
+          setUserGyldTypeSymbol(fallbackSymbol);
+          return;
+        }
+
+        // Get the first gyld_type from the array
+        const firstGyldTypeId = gyldData.gyld_type[0];
+        console.log('Using first gyld_type ID:', firstGyldTypeId);
+
+        // Then get the gyld_type record to get the @ field
+        const { data: gyldTypeData, error: gyldTypeError } = await supabase
+          .from('gyld_type')
+          .select('"@"')
+          .eq('id', firstGyldTypeId)
+          .single();
+
+        if (gyldTypeError) {
+          console.error('Error fetching gyld type:', gyldTypeError);
+          // Fallback if gyld_type lookup fails
+          setUserGyldTypeSymbol('mentoring');
+          return;
+        }
+
+        console.log('Gyld type data:', gyldTypeData);
+
+        // Extract the @ field from the gyld_type and make it lowercase
+        const gyldTypeSymbol = (gyldTypeData?.['@'] || 'mentoring').toLowerCase();
+        console.log('Setting gyld type symbol:', gyldTypeSymbol);
+        setUserGyldTypeSymbol(gyldTypeSymbol);
+      } catch (err) {
+        console.error('Error in fetchUserGyldType:', err);
+      }
+    };
+
+    fetchUserGyldType();
+  }, [userGyld]);
+  
+  // Use content template for mentoring how it works
+  const { 
+    contentTemplate: mentoringHowItWorksTemplate,
+    loading: templateLoading,
+    error: templateError
+  } = useContentTemplate(
+    'mentoring_how_it_works',
+    {
+      'gyld_type_@': userGyldTypeSymbol || 'mentoring'
+    }
+  );
+
+  // Use content template for scribe role (no dynamic variables)
+  const { 
+    contentTemplate: scribeRoleTemplate,
+    loading: scribeTemplateLoading,
+    error: scribeTemplateError
+  } = useContentTemplate('mentoring_scribe_role', {});
+
+  // Fetch potluck data when gathering detail is available
+  React.useEffect(() => {
+    if (gatheringDetail?.gathering?.id && gatheringDetail?.gatheringOther?.potluck) {
+      fetchPotluckData();
+    }
+  }, [gatheringDetail?.gathering?.id, gatheringDetail?.gatheringOther?.potluck]);
 
   // Loading state
   if (loading) {
@@ -116,6 +235,142 @@ export default function EventDetailScreen() {
   // Check if image should show placeholder
   const shouldShowPlaceholder = (imageUrl?: string) => {
     return !imageUrl || failedImages.has(imageUrl);
+  };
+
+  // Check if current user is a scribe
+  const isCurrentUserScribe = () => {
+    if (!user?.id || !gatheringDetail?.gatheringDisplay?.scribe) return false;
+    return gatheringDetail.gatheringDisplay.scribe.includes(user.id);
+  };
+
+  // Get first name from full name
+  const getFirstName = (fullName: string) => {
+    return fullName.split(' ')[0];
+  };
+
+  // Get host message for RSVP confirmation
+  const getHostMessage = () => {
+    if (gatheringDetail?.hostNames && gatheringDetail.hostNames.length > 0) {
+      const firstName = getFirstName(gatheringDetail.hostNames[0]);
+      return `If your plans change, ${firstName} would appreciate if you'd remember to change your RSVP.`;
+    }
+    return "If your plans change, we'd appreciate if you'd remember to change your RSVP.";
+  };
+
+  // Fetch potluck data for this gathering
+  const fetchPotluckData = async () => {
+    if (!gatheringDetail?.gathering?.id) return;
+    
+    try {
+      // Get potluck records for this gathering
+      const { data: potluckRecords, error: potluckError } = await supabase
+        .from('potluck')
+        .select('id, user_id, contribution')
+        .eq('gathering_id', gatheringDetail.gathering.id);
+
+      if (potluckError) {
+        console.error('Error fetching potluck data:', potluckError);
+        return;
+      }
+
+      if (!potluckRecords || potluckRecords.length === 0) {
+        setPotluckData([]);
+        return;
+      }
+
+      // Get user names for all contributors
+      const userIds = potluckRecords.map(record => record.user_id);
+      const { data: userProfiles, error: profileError } = await supabase
+        .from('users_public')
+        .select('user_id, full_name')
+        .in('user_id', userIds);
+
+      if (profileError) {
+        console.error('Error fetching user profiles for potluck:', profileError);
+        return;
+      }
+
+      // Combine potluck data with user names
+      const potluckWithNames = potluckRecords.map(record => {
+        const userProfile = userProfiles?.find(profile => profile.user_id === record.user_id);
+        return {
+          id: record.id,
+          user_name: userProfile?.full_name || 'Anonymous',
+          contribution: record.contribution || ''
+        };
+      });
+
+      setPotluckData(potluckWithNames);
+    } catch (error) {
+      console.error('Error in fetchPotluckData:', error);
+    }
+  };
+
+  // Handle potluck contribution submission
+  const handlePotluckSubmit = async () => {
+    if (!user?.id || !gatheringDetail?.gathering?.id || !potluckContribution.trim()) {
+      return;
+    }
+
+    setPotluckLoading(true);
+
+    try {
+      // Check if user already has a potluck entry for this gathering
+      const { data: existingRecord, error: checkError } = await supabase
+        .from('potluck')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('gathering_id', gatheringDetail.gathering.id)
+        .maybeSingle();
+
+      if (checkError) {
+        console.error('Error checking existing potluck record:', checkError);
+        throw checkError;
+      }
+
+      if (existingRecord) {
+        // Update existing record
+        const { error: updateError } = await supabase
+          .from('potluck')
+          .update({ contribution: potluckContribution.trim() })
+          .eq('id', existingRecord.id);
+
+        if (updateError) {
+          console.error('Error updating potluck record:', updateError);
+          throw updateError;
+        }
+      } else {
+        // Create new record
+        const { error: insertError } = await supabase
+          .from('potluck')
+          .insert({
+            user_id: user.id,
+            gathering_id: gatheringDetail.gathering.id,
+            contribution: potluckContribution.trim()
+          });
+
+        if (insertError) {
+          console.error('Error creating potluck record:', insertError);
+          throw insertError;
+        }
+      }
+
+      // Show success feedback
+      setShowPotluckSuccess(true);
+      setTimeout(() => {
+        setShowPotluckSuccess(false);
+        setShowPotluckModal(false);
+        setPotluckContribution('');
+      }, 1500);
+
+      // Refresh potluck data
+      await fetchPotluckData();
+
+    } catch (error) {
+      console.error('Error in handlePotluckSubmit:', error);
+    } finally {
+      setPotluckLoading(false);
+    }
   };
 
   // Helper function to truncate mentor bio for preview
@@ -206,30 +461,10 @@ export default function EventDetailScreen() {
     ];
   };
 
-  // Handle RSVP button press
-  const handleRSVP = async (status: 'yes' | 'no') => {
-    try {
-      await updateRSVP(status);
-      console.log(`✅ RSVP ${status} updated successfully`);
-    } catch (err) {
-      console.error(`❌ Failed to update RSVP:`, err);
-    }
-  };
-
   // Get data for display
   const { date, time } = formatDateTime(gatheringDetail.gathering.start_time, gatheringDetail.gathering.end_time);
   const location = getLocationInfo();
   const howItWorks = getHowItWorks();
-
-  // Get RSVP button state
-  const getRSVPButtonState = () => {
-    return {
-      status: rsvpStatus,
-      showYesNo: rsvpStatus === 'pending' || !rsvpStatus
-    };
-  };
-
-  const rsvpButtonState = getRSVPButtonState();
 
   return (
     <View style={styles.container}>
@@ -297,11 +532,11 @@ export default function EventDetailScreen() {
             {gatheringDetail.gatheringDisplay?.learning_topic && (
               <View style={[styles.infoRow, styles.infoRowLast]}>
                 <Ionicons 
-                  name="shield-half-sharp" 
+                  name="school" 
                   size={24} 
                   style={[
                     styles.infoIcon,
-                    { color: gatheringDetail.gatheringDisplay.learning_topic?.color || '#000000' }
+                    { color: '#000000' }
                   ]} 
                 />
                 <View style={styles.infoTextContainer}>
@@ -313,6 +548,45 @@ export default function EventDetailScreen() {
               </View>
             )}
           </View>
+
+          {/* Scribe Role Section - only show if current user is a scribe */}
+          {isCurrentUserScribe() && (
+            <View style={styles.scribeRoleSection}>
+              <Text style={styles.sectionTitleWithSpacing}>Your Role: Salon Scribe</Text>
+              
+              {/* Display content template or loading/error state */}
+              {scribeTemplateLoading ? (
+                <Text style={styles.scribeRoleDescription}>Loading...</Text>
+              ) : scribeTemplateError ? (
+                <Text style={styles.scribeRoleDescription}>
+                  As scribe, you're the steward of knowledge created in the salon. You'll record the most important insights that come out of the overall discussion.
+                </Text>
+              ) : scribeRoleTemplate ? (
+                <ContentTemplateDisplay 
+                  contentTemplate={scribeRoleTemplate}
+                  primaryTextStyle={styles.scribeRoleDescription}
+                  showSecondaryText={false}
+                  showTertiaryText={false}
+                />
+              ) : (
+                <Text style={styles.scribeRoleDescription}>
+                  As scribe, you're the steward of knowledge created in the salon. You'll record the most important insights that come out of the overall discussion.
+                </Text>
+              )}
+              
+              <TouchableOpacity 
+                style={styles.learnMoreButton}
+                onPress={() => setShowScribeRoleModal(true)}
+              >
+                <Text style={styles.learnMoreText}>Learn More</Text>
+                <Ionicons 
+                  name="chevron-forward" 
+                  size={16} 
+                  color={colors.primary} 
+                />
+              </TouchableOpacity>
+            </View>
+          )}
 
           {/* Mentor Section - only show if mentor array is not empty */}
           {gatheringDetail.gatheringDisplay?.mentor && gatheringDetail.gatheringDisplay.mentor.length > 0 && (
@@ -353,13 +627,6 @@ export default function EventDetailScreen() {
                     {gatheringDetail.mentorInfo?.employer_info?.name && (
                       <Text style={styles.mentorCompany}>
                         {gatheringDetail.mentorInfo.employer_info.name}
-                      </Text>
-                    )}
-                    
-                    {/* Show nonprofit text if nonprofit_name exists */}
-                    {gatheringDetail.mentorInfo?.mentor_satellite?.nonprofit_name && (
-                      <Text style={styles.mentorNonprofit}>
-                        Mentoring for {gatheringDetail.mentorInfo.mentor_satellite.nonprofit_name}
                       </Text>
                     )}
                   </View>
@@ -441,9 +708,29 @@ export default function EventDetailScreen() {
           {gatheringDetail.experienceTypeLabel?.toLowerCase() === 'mentoring' && (
             <View style={styles.howItWorksSection}>
               <Text style={styles.sectionTitleWithSpacing}>How Mentoring Sessions Work</Text>
-              <Text style={styles.howItWorksDescription}>
-                {mentoringContent?.description || 'Join us for an engaging mentoring experience focused on practical insights and career growth.'}
-              </Text>
+              
+              {/* Display content template or loading/error state */}
+              {templateLoading ? (
+                <Text style={styles.howItWorksDescription}>Loading...</Text>
+              ) : templateError ? (
+                <Text style={styles.howItWorksDescription}>
+                  Join us for an engaging mentoring experience focused on practical insights and career growth. 
+                  Connect with industry experts and expand your professional network in a supportive environment.
+                </Text>
+              ) : mentoringHowItWorksTemplate ? (
+                <ContentTemplateDisplay 
+                  contentTemplate={mentoringHowItWorksTemplate}
+                  primaryTextStyle={styles.howItWorksDescription}
+                  showSecondaryText={false}
+                  showTertiaryText={false}
+                />
+              ) : (
+                <Text style={styles.howItWorksDescription}>
+                  Join us for an engaging mentoring experience focused on practical insights and career growth. 
+                  Connect with industry experts and expand your professional network in a supportive environment.
+                </Text>
+              )}
+              
               <TouchableOpacity 
                 style={styles.learnMoreButton}
                 onPress={() => setShowHowItWorksModal(true)}
@@ -486,58 +773,97 @@ export default function EventDetailScreen() {
             </View>
           )}
 
+          {/* Payment Information - only show if payment_for and payment_amount exist */}
+          {gatheringDetail.gatheringOther?.payment_for && gatheringDetail.gatheringOther?.payment_amount && (
+            <View style={styles.paymentSection}>
+              <Text style={styles.sectionTitleWithSpacing}>Payment</Text>
+              
+              <Text style={styles.paymentText}>
+                ${gatheringDetail.gatheringOther.payment_amount} for {gatheringDetail.gatheringOther.payment_for.toLowerCase()}{gatheringDetail.gatheringOther.payment_venmo ? `. Please Venmo: ${gatheringDetail.gatheringOther.payment_venmo}` : ''}
+              </Text>
+            </View>
+          )}
+
+          {/* Potluck Section - only show if gathering is a potluck */}
+          {gatheringDetail.gatheringOther?.potluck && (
+            <View style={styles.potluckSection}>
+              <Text style={styles.sectionTitleWithSpacing}>Potluck</Text>
+              
+              {/* List of contributions */}
+              {potluckData.length > 0 && (
+                <View style={styles.potluckList}>
+                  {potluckData.map((item) => (
+                    <View key={item.id} style={styles.potluckItem}>
+                      <Text style={styles.potluckContributorName}>{item.user_name}</Text>
+                      <Text style={styles.potluckContribution}>{item.contribution}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+              
+              {/* Bring Something link */}
+              <TouchableOpacity 
+                style={styles.learnMoreButton}
+                onPress={() => setShowPotluckModal(true)}
+              >
+                <Text style={styles.learnMoreText}>Bring Something</Text>
+                <Ionicons 
+                  name="chevron-forward" 
+                  size={16} 
+                  color={colors.primary} 
+                />
+              </TouchableOpacity>
+            </View>
+          )}
+
         </View>
       </ScrollView>
 
       {/* Action Buttons */}
       <View style={[styles.actionButtons, { paddingBottom: spacing.lg + insets.bottom }]}>
-        <View style={styles.buttonRow}>
+        {/* State 1: No RSVP (pending) - Show Yes/No buttons */}
+        {rsvpStatus === 'pending' && (
+          <View style={styles.rsvpContainer}>
+            <Text style={styles.rsvpLabel}>RSVP:</Text>
+            <View style={styles.buttonRow}>
+              <TouchableOpacity 
+                style={styles.rsvpNoButton}
+                onPress={() => updateRSVP('no')}
+              >
+                <Text style={styles.rsvpNoButtonText}>Regrets</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.rsvpYesButton}
+                onPress={() => {
+                  updateRSVP('yes');
+                  setShowRSVPConfirmation(true);
+                }}
+              >
+                <Text style={styles.rsvpYesButtonText}>Attend</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {/* State 2: RSVP Yes - Show green "RSVP: Yes" button */}
+        {rsvpStatus === 'yes' && (
           <TouchableOpacity 
-            style={styles.secondaryButton}
-            onPress={() => {/* Share functionality */}}
+            style={styles.rsvpConfirmedYesButton}
+            onPress={() => updateRSVP('no')}
           >
-            <Text style={styles.secondaryButtonText}>Share</Text>
+            <Text style={styles.rsvpConfirmedYesButtonText}>RSVP: Yes</Text>
           </TouchableOpacity>
-          
-          {/* RSVP Buttons based on status */}
-          {rsvpButtonState.status === 'yes' ? (
-            <TouchableOpacity 
-              style={[styles.rsvpButton, styles.rsvpYesButton]}
-              onPress={() => handleRSVP('no')}
-            >
-              <Text style={styles.rsvpButtonText}>You're Going</Text>
-            </TouchableOpacity>
-          ) : rsvpButtonState.status === 'no' ? (
-            <TouchableOpacity 
-              style={styles.rsvpButton}
-              onPress={() => handleRSVP('yes')}
-            >
-              <Text style={styles.rsvpButtonText}>You're Not Going</Text>
-            </TouchableOpacity>
-          ) : rsvpButtonState.showYesNo ? (
-            <>
-              <TouchableOpacity 
-                style={styles.rsvpButton}
-                onPress={() => handleRSVP('yes')}
-              >
-                <Text style={styles.rsvpButtonText}>Yes</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.secondaryButton}
-                onPress={() => handleRSVP('no')}
-              >
-                <Text style={styles.secondaryButtonText}>No</Text>
-              </TouchableOpacity>
-            </>
-          ) : (
-            <TouchableOpacity 
-              style={styles.rsvpButton}
-              onPress={() => handleRSVP('yes')}
-            >
-              <Text style={styles.rsvpButtonText}>RSVP</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+        )}
+
+        {/* State 3: RSVP No - Show maroon "RSVP: No" button */}
+        {rsvpStatus === 'no' && (
+          <TouchableOpacity 
+            style={styles.rsvpConfirmedNoButton}
+            onPress={() => updateRSVP('yes')}
+          >
+            <Text style={styles.rsvpConfirmedNoButtonText}>RSVP: No</Text>
+          </TouchableOpacity>
+        )}
       </View>
       
       {/* Mentor Bio Modal */}
@@ -585,9 +911,65 @@ export default function EventDetailScreen() {
             </TouchableOpacity>
           </View>
           <ScrollView style={styles.modalContent}>
-            <Text style={styles.modalText}>
-              {mentoringContent?.content || getHowItWorks().map((step, index) => `${index + 1}. ${step.title}\n${step.description}`).join('\n\n')}
-            </Text>
+            {/* Display content template secondary text or fallback */}
+            {mentoringHowItWorksTemplate && mentoringHowItWorksTemplate.processed_secondary_text ? (
+              <ContentTemplateDisplay 
+                contentTemplate={mentoringHowItWorksTemplate}
+                secondaryTextStyle={styles.modalText}
+                showPrimaryText={false}
+                showSecondaryText={true}
+                showTertiaryText={false}
+              />
+            ) : (
+              /* Fallback to original hardcoded steps */
+              getHowItWorks().map((step, index) => (
+                <View key={index} style={styles.modalStep}>
+                  <View style={styles.modalStepNumber}>
+                    <Text style={styles.modalStepNumberText}>{index + 1}</Text>
+                  </View>
+                  <View style={styles.modalStepContent}>
+                    <Text style={styles.modalStepTitle}>{step.title}</Text>
+                    <Text style={styles.modalStepDescription}>{step.description}</Text>
+                  </View>
+                </View>
+              ))
+            )}
+          </ScrollView>
+        </View>
+      </Modal>
+      
+      {/* Scribe Role Modal */}
+      <Modal
+        visible={showScribeRoleModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowScribeRoleModal(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Mentoring Scribe Role</Text>
+            <TouchableOpacity 
+              onPress={() => setShowScribeRoleModal(false)}
+              style={styles.modalCloseButton}
+            >
+              <Ionicons name="close" size={24} color={colors.text.primary} />
+            </TouchableOpacity>
+          </View>
+          <ScrollView style={styles.modalContent}>
+            {/* Display content template secondary text or fallback */}
+            {scribeRoleTemplate && scribeRoleTemplate.processed_secondary_text ? (
+              <ContentTemplateDisplay 
+                contentTemplate={scribeRoleTemplate}
+                secondaryTextStyle={styles.modalText}
+                showPrimaryText={false}
+                showSecondaryText={true}
+                showTertiaryText={false}
+              />
+            ) : (
+              <Text style={styles.modalText}>
+                Scribes take knowledge generated from the salon and make it part of their gyld's broader knowledge base. They also recognize members who make valuable contributions to the discussion.
+              </Text>
+            )}
           </ScrollView>
         </View>
       </Modal>
@@ -633,6 +1015,97 @@ export default function EventDetailScreen() {
               ))}
             </View>
           </ScrollView>
+        </View>
+      </Modal>
+
+      {/* RSVP Confirmation Modal */}
+      <Modal
+        visible={showRSVPConfirmation}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowRSVPConfirmation(false)}
+      >
+        <TouchableOpacity 
+          style={styles.rsvpModalOverlay} 
+          activeOpacity={1} 
+          onPress={() => setShowRSVPConfirmation(false)}
+        >
+          <View style={styles.rsvpConfirmationContainer}>
+            <Text style={styles.rsvpConfirmationTitle}>✓ You're Going</Text>
+            <Text style={styles.rsvpConfirmationMessage}>
+              {getHostMessage()}
+            </Text>
+            
+            <TouchableOpacity 
+              style={styles.rsvpConfirmButton}
+              onPress={() => setShowRSVPConfirmation(false)}
+            >
+              <Text style={styles.rsvpConfirmButtonText}>Got it</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Potluck Contribution Modal */}
+      <Modal
+        visible={showPotluckModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowPotluckModal(false)}
+      >
+        <View style={styles.potluckModalOverlay}>
+          <View style={styles.potluckModalContainer}>
+            {!showPotluckSuccess ? (
+              <>
+                <Text style={styles.potluckModalTitle}>What You'll Bring</Text>
+                
+                <TextInput
+                  mode="outlined"
+                  value={potluckContribution}
+                  onChangeText={setPotluckContribution}
+                  placeholder="e.g., Caesar salad, chocolate chip cookies"
+                  style={styles.potluckInput}
+                  multiline={true}
+                  disabled={potluckLoading}
+                />
+                
+                <View style={styles.potluckModalButtons}>
+                  <TouchableOpacity 
+                    style={styles.potluckCancelButton}
+                    onPress={() => {
+                      setShowPotluckModal(false);
+                      setPotluckContribution('');
+                    }}
+                    disabled={potluckLoading}
+                  >
+                    <Text style={styles.potluckCancelButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={[
+                      styles.potluckSubmitButton,
+                      (!potluckContribution.trim() || potluckLoading) && styles.potluckSubmitButtonDisabled
+                    ]}
+                    onPress={handlePotluckSubmit}
+                    disabled={!potluckContribution.trim() || potluckLoading}
+                  >
+                    <Text style={styles.potluckSubmitButtonText}>
+                      {potluckLoading ? 'Adding...' : 'Add'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            ) : (
+              <View style={styles.potluckSuccessContainer}>
+                <Ionicons 
+                  name="checkmark-circle" 
+                  size={64} 
+                  color={colors.status.success} 
+                />
+                <Text style={styles.potluckSuccessText}>Added to potluck!</Text>
+              </View>
+            )}
+          </View>
         </View>
       </Modal>
     </View>
@@ -853,8 +1326,20 @@ const styles = StyleSheet.create({
   buttonRow: {
     flexDirection: 'row',
     gap: spacing.md,
+    flex: 1,
   },
-  rsvpButton: {
+  rsvpContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  rsvpLabel: {
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.semibold,
+    color: colors.text.primary,
+    minWidth: 50,
+  },
+  rsvpYesButton: {
     flex: 1,
     backgroundColor: colors.primary,
     borderRadius: spacing.md,
@@ -862,12 +1347,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  rsvpButtonText: {
+  rsvpYesButtonText: {
     fontSize: typography.sizes.md,
     fontWeight: typography.weights.semibold,
     color: colors.text.inverse,
   },
-  secondaryButton: {
+  rsvpNoButton: {
     flex: 1,
     backgroundColor: colors.background.tertiary,
     borderRadius: spacing.md,
@@ -875,13 +1360,38 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  secondaryButtonText: {
+  rsvpNoButtonText: {
     fontSize: typography.sizes.md,
     fontWeight: typography.weights.medium,
-    color: colors.text.primary,
+    color: colors.text.secondary,
   },
-  rsvpYesButton: {
-    backgroundColor: colors.status.success,
+  
+  // State 2: RSVP Yes confirmed (light green)
+  rsvpConfirmedYesButton: {
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    borderRadius: spacing.md,
+    paddingVertical: spacing.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rsvpConfirmedYesButtonText: {
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.semibold,
+    color: colors.status.success,
+  },
+  
+  // State 3: RSVP No confirmed (light maroon)
+  rsvpConfirmedNoButton: {
+    backgroundColor: 'rgba(165, 42, 42, 0.1)',
+    borderRadius: spacing.md,
+    paddingVertical: spacing.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rsvpConfirmedNoButtonText: {
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.semibold,
+    color: '#A52A2A',
   },
   
   // Mentor Bio Section
@@ -969,6 +1479,17 @@ const styles = StyleSheet.create({
   // How It Works Section
   howItWorksSection: {
     // Removed marginBottom to prevent compound spacing
+  },
+  
+  // Scribe Role Section
+  scribeRoleSection: {
+    // Removed marginBottom to prevent compound spacing
+  },
+  scribeRoleDescription: {
+    fontSize: typography.sizes.md,
+    color: colors.text.primary,
+    lineHeight: 22,
+    marginBottom: spacing.md,
   },
   howItWorksButton: {
     flexDirection: 'row',
@@ -1149,6 +1670,47 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
   },
   
+  // Payment Section
+  paymentSection: {
+    // Removed marginBottom to prevent compound spacing
+  },
+  paymentText: {
+    fontSize: typography.sizes.md,
+    color: colors.text.primary,
+    lineHeight: 22,
+  },
+  
+  // Potluck Section
+  potluckSection: {
+    // Removed marginBottom to prevent compound spacing
+  },
+  potluckList: {
+    marginBottom: spacing.md,
+  },
+  potluckItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+  },
+  potluckContributorName: {
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.medium,
+    color: colors.text.primary,
+    flex: 1,
+    marginRight: spacing.md,
+  },
+  potluckContribution: {
+    fontSize: typography.sizes.md,
+    color: colors.text.secondary,
+    flex: 2,
+  },
+  potluckEmptyText: {
+    fontSize: typography.sizes.md,
+    color: colors.text.tertiary,
+    fontStyle: 'italic',
+    marginBottom: spacing.md,
+  },
+  
   // Modal Styles
   modalContainer: {
     flex: 1,
@@ -1238,5 +1800,120 @@ const styles = StyleSheet.create({
     color: colors.text.primary,
     textAlign: 'center',
     fontWeight: typography.weights.medium,
+  },
+  
+  // RSVP Confirmation Modal Styles
+  rsvpModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  rsvpConfirmationContainer: {
+    backgroundColor: colors.background.secondary,
+    borderRadius: 12,
+    padding: spacing.lg,
+    margin: spacing.lg,
+    width: 320,
+    height: 240,
+    elevation: 8,
+    justifyContent: 'space-between',
+  },
+  rsvpConfirmationTitle: {
+    fontSize: typography.sizes.lg,
+    fontWeight: typography.weights.semibold,
+    color: colors.status.success,
+    textAlign: 'center',
+    marginBottom: spacing.md,
+    lineHeight: 24,
+  },
+  rsvpConfirmationMessage: {
+    fontSize: typography.sizes.md,
+    color: colors.text.secondary,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: spacing.md,
+  },
+  rsvpConfirmButton: {
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  rsvpConfirmButtonText: {
+    color: colors.status.success,
+    fontWeight: typography.weights.semibold,
+    fontSize: typography.sizes.md,
+  },
+  
+  // Potluck Contribution Modal Styles
+  potluckModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.lg,
+  },
+  potluckModalContainer: {
+    backgroundColor: colors.background.secondary,
+    borderRadius: 12,
+    padding: spacing.lg,
+    width: '100%',
+    maxWidth: 400,
+    elevation: 8,
+  },
+  potluckModalTitle: {
+    fontSize: typography.sizes.lg,
+    fontWeight: typography.weights.semibold,
+    color: colors.text.primary,
+    textAlign: 'center',
+    marginBottom: spacing.lg,
+  },
+  potluckInput: {
+    marginBottom: spacing.lg,
+    // Let React Native Paper theme handle the styling
+    // The theme will automatically use the brand color for focused state
+  },
+  potluckModalButtons: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  potluckCancelButton: {
+    flex: 1,
+    backgroundColor: colors.background.tertiary,
+    borderRadius: 8,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+  },
+  potluckCancelButtonText: {
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.medium,
+    color: colors.text.secondary,
+  },
+  potluckSubmitButton: {
+    flex: 1,
+    backgroundColor: colors.primary,
+    borderRadius: 8,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+  },
+  potluckSubmitButtonDisabled: {
+    backgroundColor: colors.text.tertiary,
+  },
+  potluckSubmitButtonText: {
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.semibold,
+    color: colors.text.inverse,
+  },
+  potluckSuccessContainer: {
+    alignItems: 'center',
+    paddingVertical: spacing.xl,
+  },
+  potluckSuccessText: {
+    fontSize: typography.sizes.lg,
+    fontWeight: typography.weights.semibold,
+    color: colors.status.success,
+    marginTop: spacing.md,
   },
 }); 

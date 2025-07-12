@@ -1,8 +1,6 @@
 export { default as RoleOverviewScreen } from './RoleOverviewScreen';
 export { default as RoleRecruitScreen } from './RoleRecruitScreen';
 export { default as RoleInductScreen } from './RoleInductScreen';
-export { default as RoleOrgMentoringScreen } from './RoleOrgMentoringScreen';
-export { default as RoleOrgEventScreen } from './RoleOrgEventScreen';
 export { default as RoleLeadBonoScreen } from './RoleLeadBonoScreen';
 export { default as RoleLeadTeamScreen } from './RoleLeadTeamScreen';
 export { default as RoleLeadPodScreen } from './RoleLeadPodScreen';

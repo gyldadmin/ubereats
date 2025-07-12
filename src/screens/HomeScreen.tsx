@@ -1,7 +1,7 @@
 ﻿import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { Text, ActivityIndicator } from 'react-native-paper';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { theme } from '../styles/theme';
 import { GatheringCardCompactV1 } from '../components/ui';
 import { useHomeGatherings } from '../hooks/useHomeGatherings';
@@ -16,6 +16,13 @@ export default function HomeScreen() {
   
   // State for show more/less functionality
   const [isExpanded, setIsExpanded] = useState(false);
+
+  // Refresh data when screen comes into focus (e.g., returning from detail screen)
+  useFocusEffect(
+    React.useCallback(() => {
+      refresh();
+    }, [refresh])
+  );
 
   // Helper function to get visible gatherings based on expansion state
   const getVisibleGatherings = () => {
@@ -40,8 +47,8 @@ export default function HomeScreen() {
   const handleGatheringPress = (gatheringData: GatheringCardData) => {
     // Check if user is host of this gathering
     if (gatheringData.userRole.isHost) {
-      // Navigate to EventOrgScreen for hosts
-      (navigation as any).navigate('EventOrg', { gatheringId: gatheringData.gathering.id });
+      // Navigate to GatheringManage for hosts
+      (navigation as any).navigate('GatheringManage', { gatheringId: gatheringData.gathering.id });
     } else {
       // Navigate to EventDetailScreen for non-hosts
       (navigation as any).navigate('EventDetail', { 
@@ -188,6 +195,49 @@ export default function HomeScreen() {
           )}
         </View>
 
+        {/* TEMPORARY: Host Screens Testing Section */}
+        <View style={styles.tempTestingSection}>
+          <Text style={styles.tempTestingTitle}>🚧 TEMP: Host Screens Testing</Text>
+          <View style={styles.tempButtonGrid}>
+            <TouchableOpacity
+              style={styles.tempButton}
+              onPress={() => (navigation as any).navigate('GatheringSetup')}
+            >
+              <Text style={styles.tempButtonText}>Setup</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.tempButton}
+              onPress={() => (navigation as any).navigate('GatheringManage')}
+            >
+              <Text style={styles.tempButtonText}>Manage</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.tempButton}
+              onPress={() => (navigation as any).navigate('GatheringPromote')}
+            >
+              <Text style={styles.tempButtonText}>Promote</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.tempButton}
+              onPress={() => (navigation as any).navigate('GatheringResources')}
+            >
+              <Text style={styles.tempButtonText}>Resources</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.tempButton}
+              onPress={() => (navigation as any).navigate('MentoringCalendar')}
+            >
+              <Text style={styles.tempButtonText}>Calendar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.tempButton}
+              onPress={() => (navigation as any).navigate('MentorFinder')}
+            >
+              <Text style={styles.tempButtonText}>Find Mentor</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
         <View style={styles.footer} />
       </ScrollView>
     </View>
@@ -278,5 +328,41 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     textAlign: 'center',
+  },
+  // Temporary testing styles
+  tempTestingSection: {
+    marginVertical: theme.spacing.xl,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.lg,
+    backgroundColor: theme.colors.background.secondary,
+    borderRadius: theme.spacing.md,
+    marginHorizontal: theme.spacing.lg,
+  },
+  tempTestingTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: theme.colors.text.primary,
+    textAlign: 'center',
+    marginBottom: theme.spacing.md,
+  },
+  tempButtonGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: theme.spacing.sm,
+  },
+  tempButton: {
+    backgroundColor: theme.colors.primary,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.spacing.sm,
+    minWidth: '48%',
+    alignItems: 'center',
+    marginBottom: theme.spacing.sm,
+  },
+  tempButtonText: {
+    color: theme.colors.background.primary,
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

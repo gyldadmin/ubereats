@@ -387,6 +387,8 @@ export const useGatheringDetail = (gatheringId: string) => {
     });
 
     try {
+      console.log('🔍 Step 1: Getting status ID for:', status);
+      
       // Get the status ID from part_gath_status table
       const { data: statusData, error: statusError } = await supabase
         .from('part_gath_status')
@@ -394,30 +396,70 @@ export const useGatheringDetail = (gatheringId: string) => {
         .eq('label', status)
         .single();
 
-      if (statusError) throw statusError;
+      if (statusError) {
+        console.error('❌ Error getting status ID:', statusError);
+        throw statusError;
+      }
 
-      // Upsert the participation record
-      const { error: upsertError } = await supabase
+      console.log('✅ Status ID found:', statusData.id);
+      console.log('🔍 Step 2: Checking for existing participation record');
+
+      // Check if participation record already exists
+      const { data: existingRecord, error: existingError } = await supabase
         .from('participation_gatherings')
-        .upsert({
-          user_id: user.id,
-          gathering_id: gatheringId,
-          part_gath_status: statusData.id
-        }, {
-          onConflict: 'user_id,gathering_id'
-        });
+        .select('id, part_gath_status')
+        .eq('user_id', user.id)
+        .eq('gathering_id', gatheringId)
+        .maybeSingle();
 
-      if (upsertError) throw upsertError;
+      if (existingError) {
+        console.error('❌ Error checking existing record:', existingError);
+        throw existingError;
+      }
+
+      console.log('📋 Existing record:', existingRecord);
+
+      if (existingRecord) {
+        console.log('🔍 Step 3: Updating existing record');
+        
+        // Update existing record
+        const { data: updateData, error: updateError } = await supabase
+          .from('participation_gatherings')
+          .update({ part_gath_status: statusData.id })
+          .eq('id', existingRecord.id);
+
+        if (updateError) {
+          console.error('❌ Update error:', updateError);
+          throw updateError;
+        }
+
+        console.log('✅ Record updated successfully:', updateData);
+      } else {
+        console.log('🔍 Step 3: Creating new record');
+        
+        // Create new record
+        const { data: insertData, error: insertError } = await supabase
+          .from('participation_gatherings')
+          .insert({
+            user_id: user.id,
+            gathering_id: gatheringId,
+            part_gath_status: statusData.id
+          });
+
+        if (insertError) {
+          console.error('❌ Insert error:', insertError);
+          throw insertError;
+        }
+
+        console.log('✅ Record created successfully:', insertData);
+      }
 
       console.log('✅ RSVP updated successfully');
-      
-      // Refresh data to ensure consistency
-      await fetchGatheringDetail();
 
     } catch (err) {
       console.error('❌ Error updating RSVP:', err);
       
-      // Revert optimistic update on error
+      // Revert optimistic update on error by refetching data
       await fetchGatheringDetail();
       
       throw err;

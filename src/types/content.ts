@@ -1,19 +1,35 @@
-// Content management types
-
-export interface ContentBlock {
-  title: string;
-  description: string;
-  content: string;
+// Content Template Types
+export interface ContentTemplate {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  content_key: string;
+  content_type: 'email' | 'push' | 'sms' | 'display';
+  usage_context: string | null;
+  dynamic_variables: DynamicVariable[];
+  primary_text: string | null;
+  secondary_text: string | null;
+  tertiary_text: string | null;
 }
 
-export interface ContentDatabase {
-  [key: string]: ContentBlock;
+export interface DynamicVariable {
+  variable: string;
+  description: string;
 }
 
-export type ContentKey = 'mentoring_how_it_works';
+export interface ProcessedContentTemplate {
+  content_key: string;
+  content_type: string;
+  usage_context: string | null;
+  primary_text: string | null;
+  secondary_text: string | null;
+  tertiary_text: string | null;
+  dynamic_variables: DynamicVariable[];
+  processed_primary_text: string | null;
+  processed_secondary_text: string | null;
+  processed_tertiary_text: string | null;
+}
 
-export interface ProcessedContent {
-  title: string;
-  description: string;
-  content: string;
+export interface ContentTemplateVariableData {
+  [key: string]: string | number | null | undefined;
 } 
