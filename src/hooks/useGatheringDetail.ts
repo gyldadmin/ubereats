@@ -187,8 +187,8 @@ export const useGatheringDetail = (gatheringId: string) => {
           *,
           gathering_status!inner(label),
           experience_type(label, image_horizontal),
-          gathering_displays!inner(*, learning_topic(label, color)),
-          gathering_other!inner(*)
+          gathering_displays(*, learning_topic(label, color)),
+          gathering_other(*)
         `)
         .eq('id', gatheringId)
         .single();

@@ -8,17 +8,16 @@ import { NavigationListItem } from '../../components/ui';
 export default function GatheringManageScreen() {
   const navigation = useNavigation();
 
-  const handleNavigateToPromote = () => {
+  const handlePromoteGathering = () => {
     (navigation as any).navigate('GatheringPromote');
   };
 
-  const handleNavigateToResources = () => {
+  const handleTipsAndTalkingPoints = () => {
     (navigation as any).navigate('GatheringResources');
   };
 
-  const handleViewGuestList = () => {
-    // TODO: Navigate to guest list screen
-    console.log('Navigate to guest list');
+  const handleEditGathering = () => {
+    (navigation as any).navigate('GatheringSetup');
   };
 
   return (
@@ -38,22 +37,22 @@ export default function GatheringManageScreen() {
         </Text>
         
         <NavigationListItem
-          icon="users"
-          title="View Guest List"
-          onPress={handleViewGuestList}
+          icon="help-circle"
+          title="Promote Your Gathering"
+          onPress={handlePromoteGathering}
           showTopDivider={true}
         />
         
         <NavigationListItem
-          icon="megaphone"
-          title="Promote Gathering"
-          onPress={handleNavigateToPromote}
+          icon="help-circle"
+          title="Tips & Talking Points"
+          onPress={handleTipsAndTalkingPoints}
         />
         
         <NavigationListItem
-          icon="help-circle"
-          title="Tips & Resources"
-          onPress={handleNavigateToResources}
+          icon="edit"
+          title="Edit Gathering"
+          onPress={handleEditGathering}
         />
       </View>
     </ScrollView>

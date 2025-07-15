@@ -2,9 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuthStore } from '../stores/authStore';
 
-// Interface for gyld member data (combining users_public and users_internal)
+// Interface for gyld member data (simplified - only users_public data)
 export interface GyldMember {
-  // From users_public
+  // From users_public - all we need for host selection
   user_id: string;
   candidate?: string;
   employer?: string;
@@ -16,9 +16,8 @@ export interface GyldMember {
   title?: string;
   profpic?: string;
   list?: string;
-  user_status?: string;
   
-  // From users_internal
+  // Users_internal fields - kept for backwards compatibility but not used
   neighborhood?: string;
   start_field?: string;
   proflink?: string;
@@ -26,15 +25,12 @@ export interface GyldMember {
   knowledge_domain?: string[];
   role_interest?: string[];
   notification_preferences?: any;
-  
-  // From user_status join
-  user_status_label?: string;
+  user_status?: string;
 }
 
 /**
  * Hook for fetching gyld members
- * Query: "Search for users where users_public.gyld = current_user.users_public.gyld 
- * AND users_public.user_status = 'member'"
+ * Simplified: Only uses users_public data since that's all we need for host selection
  */
 export const useGyldMembers = () => {
   const [members, setMembers] = useState<GyldMember[]>([]);
@@ -47,6 +43,7 @@ export const useGyldMembers = () => {
   const fetchMembers = useCallback(async () => {
     // Don't fetch if user doesn't have a gyld
     if (!userGyld) {
+      console.log('❌ No userGyld found, returning empty members array');
       setMembers([]);
       return;
     }
@@ -55,35 +52,32 @@ export const useGyldMembers = () => {
     setError(null);
 
     try {
-      // Query users_public with joins to users_internal and user_status
-      const { data, error: supabaseError } = await supabase
+      // Simple query: just get all users in the same gyld from users_public
+      // No need to join with users_internal for host selection
+      console.log('🔍 Querying users_public with gyld:', userGyld);
+      const { data: publicUsers, error: publicError } = await supabase
         .from('users_public')
-        .select(`
-          *,
-          users_internal (
-            neighborhood,
-            start_field,
-            proflink,
-            activity_type,
-            knowledge_domain,
-            role_interest,
-            notification_preferences
-          ),
-          user_status!inner(
-            label
-          )
-        `)
-        .eq('gyld', userGyld)                        // users_public.gyld = current_user.gyld
-        .eq('user_status.label', 'member')           // user_status = 'member' (join + filter)
-        .order('full_name', { ascending: true });    // Order by full name
+        .select('*')
+        .eq('gyld', userGyld)
+        .order('full_name', { ascending: true });
 
-      if (supabaseError) {
-        throw supabaseError;
+      console.log('📊 users_public query result:');
+      console.log('- publicUsers count:', publicUsers?.length || 0);
+      console.log('- publicError:', publicError);
+
+      if (publicError) {
+        throw publicError;
       }
 
-      // Transform data to flatten the joined objects
-      const transformedData: GyldMember[] = (data || []).map(user => ({
-        // Users_public fields
+      if (!publicUsers || publicUsers.length === 0) {
+        console.log('❌ No public users found in gyld, returning empty array');
+        setMembers([]);
+        return;
+      }
+
+      // Transform data - no need for complex joins, just use public data
+      const transformedData: GyldMember[] = publicUsers.map(user => ({
+        // Users_public fields - all we need for host selection
         user_id: user.user_id,
         candidate: user.candidate,
         employer: user.employer,
@@ -95,20 +89,22 @@ export const useGyldMembers = () => {
         title: user.title,
         profpic: user.profpic,
         list: user.list,
-        user_status: user.user_status,
         
-        // Users_internal fields (flattened)
-        neighborhood: user.users_internal?.neighborhood,
-        start_field: user.users_internal?.start_field,
-        proflink: user.users_internal?.proflink,
-        activity_type: user.users_internal?.activity_type,
-        knowledge_domain: user.users_internal?.knowledge_domain,
-        role_interest: user.users_internal?.role_interest,
-        notification_preferences: user.users_internal?.notification_preferences,
-        
-        // User_status label
-        user_status_label: user.user_status?.label,
+        // Users_internal fields - not needed for host selection, set to undefined
+        neighborhood: undefined,
+        start_field: undefined,
+        proflink: undefined,
+        activity_type: undefined,
+        knowledge_domain: undefined,
+        role_interest: undefined,
+        notification_preferences: undefined,
+        user_status: undefined, // Not needed for host selection
       }));
+
+      console.log('🎯 Final transformedData:');
+      console.log('- transformedData count:', transformedData.length);
+      console.log('- transformedData sample:', transformedData.slice(0, 2));
+      console.log('✅ Setting members in useGyldMembers');
 
       setMembers(transformedData);
 

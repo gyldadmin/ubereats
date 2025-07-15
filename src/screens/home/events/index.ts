@@ -1,1 +1,1 @@
-export { default as EventDetailScreen } from './EventDetailScreen'; 
+export { default as EventDetailScreen } from './EventDetailScreen';

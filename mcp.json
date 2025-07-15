@@ -8,8 +8,8 @@
         "-y",
         "@supabase/mcp-server-supabase@latest",
         "--read-only",
-        "--project-ref=izyvwgdrqkuzeahrdrue",
-        "--access-token=sbp_0911e2df70178ec90917d0c7d5ddb1d203f031c7"
+        "--project-ref=bciotailhfupsmujjiag",
+        "--access-token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJjaW90YWlsaGZ1cHNtdWpqaWFnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MDkzNDc4MiwiZXhwIjoyMDY2NTEwNzgyfQ.aNIW-brUapf-gzAu8ORmQcwut8qhavULQCxteLfEdcc"
       ]
     },
     "context7": {
