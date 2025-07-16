@@ -6,6 +6,20 @@ import { theme } from '../styles/theme';
 import { GatheringCardCompactV1 } from '../components/ui';
 import { useHomeGatherings } from '../hooks/useHomeGatherings';
 import type { GatheringCardData } from '../hooks/useHomeGatherings';
+import { 
+  Input, 
+  TextArea, 
+  Dropdown, 
+  MultiSelect, 
+  SegmentedInput, 
+  ChipSelection, 
+  Checkbox, 
+  Toggle,
+  NativeDateTimePicker,
+  PaperDropdown,
+  SearchableDropdown,
+  EventDateTimePicker 
+} from '../components/inputs';
 
 // Constants for expandable list behavior
 const INITIAL_VISIBLE_COUNT = 3;
@@ -238,11 +252,201 @@ export default function HomeScreen() {
           </View>
         </View>
 
+        {/* TEMPORARY: Input Components Testing Section */}
+        <InputTestingSection />
+
         <View style={styles.footer} />
       </ScrollView>
     </View>
   );
 }
+
+// TEMPORARY: Input Components Testing Section
+const InputTestingSection = () => {
+  const [inputValue, setInputValue] = useState('');
+  const [textAreaValue, setTextAreaValue] = useState('');
+  const [nativeDateValue, setNativeDateValue] = useState<Date>(new Date());
+
+  const [dropdownValue, setDropdownValue] = useState<string | undefined>(undefined);
+  const [multiSelectValue, setMultiSelectValue] = useState<string[]>([]);
+  const [segmentedValue, setSegmentedValue] = useState<string>('');
+  const [chipSelectionValue, setChipSelectionValue] = useState<string[]>([]);
+  const [checkboxValue, setCheckboxValue] = useState(false);
+  const [toggleValue, setToggleValue] = useState(false);
+
+  // Native dropdown state
+  const [paperDropdownValue, setPaperDropdownValue] = useState<string>('');
+  
+  // Searchable dropdown state
+  const [searchableDropdownValue, setSearchableDropdownValue] = useState<string>('');
+
+  // Event date time picker state
+  const createDefaultStartTime = () => {
+    const now = new Date();
+    now.setHours(18, 0, 0, 0); // 6 PM today
+    return now;
+  };
+  
+  const createDefaultEndTime = () => {
+    const start = createDefaultStartTime();
+    const end = new Date(start);
+    end.setHours(start.getHours() + 1, start.getMinutes() + 30, 0, 0); // Add 1.5 hours
+    return end;
+  };
+
+  const [eventStartTime, setEventStartTime] = useState<Date>(createDefaultStartTime());
+  const [eventEndTime, setEventEndTime] = useState<Date>(createDefaultEndTime());
+
+  // Remove these dropdown picker state variables:
+  // const [dropdownOpen, setDropdownOpen] = useState(false);
+  // const [dropdownItems, setDropdownItems] = useState([...]);
+
+  // Remove the searchableDropdownOptions array:
+  // const searchableDropdownOptions = [...];
+
+  const dropdownOptions = [
+    { value: 'option1', label: 'Option 1' },
+    { value: 'option2', label: 'Option 2' },
+    { value: 'option3', label: 'Option 3' },
+  ];
+
+  const multiSelectOptions = [
+    { value: 'item1', label: 'Item 1' },
+    { value: 'item2', label: 'Item 2' },
+    { value: 'item3', label: 'Item 3' },
+  ];
+
+  const segmentedOptions = [
+    { value: 'opt1', label: 'Opt 1' },
+    { value: 'opt2', label: 'Opt 2' },
+    { value: 'opt3', label: 'Opt 3' },
+  ];
+
+  const chipOptions = [
+    { value: 'chip1', label: 'Chip 1' },
+    { value: 'chip2', label: 'Chip 2' },
+    { value: 'chip3', label: 'Chip 3' },
+  ];
+
+  const searchableDropdownOptions = [
+    { label: 'Apple', value: 'apple' },
+    { label: 'Banana', value: 'banana' },
+    { label: 'Cherry', value: 'cherry' },
+    { label: 'Date', value: 'date' },
+    { label: 'Elderberry', value: 'elderberry' },
+    { label: 'Fig', value: 'fig' },
+    { label: 'Grape', value: 'grape' },
+    { label: 'Honeydew', value: 'honeydew' },
+    { label: 'Kiwi', value: 'kiwi' },
+    { label: 'Lemon', value: 'lemon' },
+    { label: 'Mango', value: 'mango' },
+    { label: 'Orange', value: 'orange' },
+    { label: 'Papaya', value: 'papaya' },
+    { label: 'Quince', value: 'quince' },
+    { label: 'Raspberry', value: 'raspberry' },
+    { label: 'Strawberry', value: 'strawberry' },
+  ];
+
+  // Remove the entire DropDownPicker section
+  //
+
+  return (
+    <View style={styles.inputTestingSection}>
+      <Text style={styles.inputTestingTitle}>🧪 TEMP: Input Components Testing</Text>
+      
+      <EventDateTimePicker
+        label="Event Date & Time"
+        startTime={eventStartTime}
+        endTime={eventEndTime}
+        onStartTimeChange={setEventStartTime}
+        onEndTimeChange={setEventEndTime}
+      />
+      
+      <Input
+        label="label"
+        value={inputValue}
+        onValueChange={setInputValue}
+        placeholder="Type here..."
+      />
+      
+      <TextArea
+        label="Multi Line Input"
+        value={textAreaValue}
+        onValueChange={setTextAreaValue}
+        placeholder="Type your message..."
+        maxLength={200}
+      />
+      
+      <Dropdown
+        label="Dropdown"
+        value={dropdownValue}
+        onValueChange={setDropdownValue}
+        options={dropdownOptions}
+      />
+      
+      <MultiSelect
+        options={multiSelectOptions}
+        selectedValues={multiSelectValue}
+        onSelectionChange={setMultiSelectValue}
+        title="Multi Select"
+      />
+      
+      <SegmentedInput
+        label="Segmented Input"
+        value={segmentedValue}
+        onValueChange={setSegmentedValue}
+        options={segmentedOptions}
+      />
+      
+      <ChipSelection
+        label="Chip Selection"
+        value={chipSelectionValue}
+        onValueChange={setChipSelectionValue}
+        options={chipOptions}
+        multiSelect={true}
+      />
+      
+      <Checkbox
+        label="Checkbox"
+        value={checkboxValue}
+        onValueChange={setCheckboxValue}
+      />
+      
+      <Toggle
+        label="Toggle"
+        value={toggleValue}
+        onValueChange={setToggleValue}
+      />
+      
+      <NativeDateTimePicker
+        label="Native DateTimePicker"
+        value={nativeDateValue}
+        onValueChange={setNativeDateValue}
+        mode="datetime"
+        minuteInterval={15}
+      />
+
+      <PaperDropdown
+        label="Paper Dropdown"
+        value={paperDropdownValue}
+        onValueChange={setPaperDropdownValue}
+        options={dropdownOptions}
+        placeholder="Select an option"
+      />
+
+      <SearchableDropdown
+        label="Searchable Dropdown"
+        value={searchableDropdownValue}
+        onValueChange={setSearchableDropdownValue}
+        options={searchableDropdownOptions}
+        placeholder="Search fruits..."
+      />
+
+      {/* Remove the duplicate EventDateTimePicker from here */}
+
+    </View>
+  );
+};
 
 const styles = StyleSheet.create({
   container: {
@@ -365,4 +569,20 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+  inputTestingSection: {
+    marginVertical: theme.spacing.xl,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.lg,
+    backgroundColor: theme.colors.background.secondary,
+    borderRadius: theme.spacing.md,
+    marginHorizontal: theme.spacing.lg,
+  },
+  inputTestingTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: theme.colors.text.primary,
+    textAlign: 'center',
+    marginBottom: theme.spacing.lg,
+  },
+
 });

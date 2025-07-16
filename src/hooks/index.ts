@@ -8,4 +8,5 @@ export * from './useGyldGatherings';
 export * from './usePlannedWorkflows';
 export * from './useHostData';
 export * from './useSliderForm';
-export * from './useGatheringSetup'; 
+export * from './useGatheringSetup';
+export * from './useExperienceTypes'; 

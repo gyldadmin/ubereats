@@ -8,6 +8,7 @@ import {
   Surface,
   Button,
 } from 'react-native-paper';
+import { Ionicons } from '@expo/vector-icons';
 import { globalStyles } from '../../styles';
 
 interface Option {
@@ -129,8 +130,8 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
         onPress={openModal}
         disabled={disabled || selectedValues.length >= 3}
         style={[
-          styles.inputContainer,
-          globalStyles.input,
+          globalStyles.input, // Applied first
+          styles.inputContainer, // Applied second - OVERRIDES globalStyles!
           (disabled || selectedValues.length >= 3) && styles.disabled,
         ]}
       >
@@ -154,7 +155,11 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
           
           {/* Placeholder text area */}
           {selectedValues.length < 3 && (
-            <View style={styles.placeholderContainer}>
+            <View style={[
+              styles.placeholderContainer,
+              selectedOptions.length === 0 && { flex: 1 }, // Restore flex for initial placeholder height
+              selectedOptions.length > 0 && { paddingLeft: 8 } // Only add left padding for "Add more..."
+            ]}>
               <Text style={[
                 styles.placeholderText,
                 { color: selectedOptions.length > 0 ? theme.colors.onSurfaceVariant : theme.colors.onSurfaceVariant }
@@ -208,10 +213,9 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
               borderBottomWidth: 1,
               borderBottomColor: '#e0e0e0',
             }}>
-              <Text style={{
-                fontSize: 18,
-                fontWeight: 'bold',
-              }}>{title}</Text>
+              <TouchableOpacity onPress={closeModal} style={{ padding: 4 }}>
+                <Ionicons name="close" size={24} color={theme.colors.onSurfaceVariant} />
+              </TouchableOpacity>
               <Button
                 mode="contained"
                 onPress={handleAddSelections}
@@ -315,9 +319,9 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
                     }}
                   >
                     <View style={{
-                      width: 30, // Reduced from 40 (25% reduction)
-                      height: 30, // Reduced from 40 (25% reduction)
-                      borderRadius: 15, // Reduced from 20 (25% reduction)
+                      width: 22, // Reduced from 30 by 25%
+                      height: 22, // Reduced from 30 by 25%
+                      borderRadius: 11, // Reduced from 15 by 25%
                       backgroundColor: isDisabled ? '#ccc' : theme.colors.primary,
                       justifyContent: 'center',
                       alignItems: 'center',
@@ -325,7 +329,7 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
                     }}>
                       <List.Icon 
                         icon="plus" 
-                        size={15} // Reduced from 20 (25% reduction)
+                        size={12} // Reduced from 15 by 25%
                         color="white" 
                       />
                     </View>
@@ -372,15 +376,16 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   inputContainer: {
-    minHeight: 60, // Changed from 56 to 60 pixels
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    minHeight: 54, // Changed from 56 to 54 to adjust total height
+    paddingVertical: 0, // Set to 0 so only global padding applies
+    paddingHorizontal: 14, // Add 14px horizontal padding (overrides global 12px)
+    justifyContent: 'center', // Add this to center content vertically in the 54px container
   },
   contentContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    alignItems: 'center',
-    minHeight: 40,
+    alignItems: 'center', // Vertically center chips and placeholder
+    minHeight: 24, // Adjusted: 48px total - 12px global padding - 12px for chips = 24px
   },
   chip: {
     marginRight: 6,
@@ -388,14 +393,15 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   placeholderContainer: {
-    flex: 1,
-    minWidth: 120,
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-    marginLeft: 4,
+    paddingVertical: 0,
+    paddingHorizontal: 0, // Reverted to 0 to remove extra horizontal padding
+    marginLeft: 0,
+    justifyContent: 'center',
+    minHeight: 24, // Match the contentContainer height
   },
   placeholderText: {
     fontSize: 16,
+    lineHeight: 20, // Add explicit line height to help with vertical centering
   },
   disabled: {
     opacity: 0.6,

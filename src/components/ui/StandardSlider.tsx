@@ -167,7 +167,7 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.sizes.lg,
     fontWeight: theme.typography.weights.bold,
     color: theme.colors.text.primary,
-    marginTop: 20, // Changed from 32 to 20 pixels
+    marginTop: 5, // Reduced from 20 to 5 pixels for 45px total spacing (16+8+16+5)
     marginBottom: 16,
   },
 

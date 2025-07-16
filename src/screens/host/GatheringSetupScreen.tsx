@@ -4,7 +4,7 @@ import { Text } from 'react-native-paper';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
-import { NavigationListItem, SetupListItem, TitleAndHostsSlider } from '../../components/ui';
+import { NavigationListItem, SetupListItem, TitleAndHostsSlider, DateTimeSlider, LocationSlider, MentorSlider, DescriptionSlider, GatheringTypeSlider } from '../../components/ui';
 import { useHostData } from '../../hooks/useHostData';
 import { useGatheringSetup } from '../../hooks/useGatheringSetup';
 import { useSliderForm } from '../../hooks/useSliderForm';
@@ -45,26 +45,14 @@ export default function GatheringSetupScreen() {
   // Modal states
   const [showGatheringTypeSlider, setShowGatheringTypeSlider] = useState(false);
   const [showTitleAndHostsSlider, setShowTitleAndHostsSlider] = useState(false);
+  const [showDateTimeSlider, setShowDateTimeSlider] = useState(false);
+  const [showLocationSlider, setShowLocationSlider] = useState(false);
+  const [showMentorSlider, setShowMentorSlider] = useState(false);
+  const [showDescriptionSlider, setShowDescriptionSlider] = useState(false);
   const [showSaveChangesPopup, setShowSaveChangesPopup] = useState(false);
 
-  // Form state management for gathering type slider
-  const {
-    formData: gatheringTypeData,
-    savedData: savedGatheringTypeData,
-    hasUnsavedChanges: hasUnsavedGatheringTypeChanges,
-    updateFormData: updateGatheringTypeData,
-    saveFormData: saveGatheringTypeData,
-    resetFormData: resetGatheringTypeData
-  } = useSliderForm(
-    {
-      gatheringType: 'mentoring' // Default value
-    },
-    async (data) => {
-      // Save function - will implement actual database save later
-      console.log('Saving gathering type data:', data);
-      // TODO: Implement actual save to database/store
-    }
-  );
+  // Simple state for gathering type changes tracking
+  const [hasUnsavedGatheringTypeChanges, setHasUnsavedGatheringTypeChanges] = useState(false);
 
   const handleTipsAndFAQs = () => {
     (navigation as any).navigate('GatheringResources');
@@ -87,14 +75,14 @@ export default function GatheringSetupScreen() {
   // Handle save changes popup responses
   const handleSaveChanges = () => {
     // Save the data
-    saveGatheringTypeData();
+    setHasUnsavedGatheringTypeChanges(false);
     setShowSaveChangesPopup(false);
     setShowGatheringTypeSlider(false);
   };
 
   const handleDiscardChanges = () => {
     // Reset form data to saved state
-    resetGatheringTypeData();
+    setHasUnsavedGatheringTypeChanges(false);
     setShowSaveChangesPopup(false);
     setShowGatheringTypeSlider(false);
   };
@@ -106,11 +94,10 @@ export default function GatheringSetupScreen() {
       await saveGatheringData(async () => {
         // TODO: Implement actual gathering type save to database
         // This will save to the main gatherings table: { experience_type: selectedType }
-        // For now, just save to local form state
-        saveGatheringTypeData();
-        console.log('Gathering type saved:', gatheringTypeData);
+        console.log('Gathering type saved');
       }, false); // gathering_type doesn't require satellites
       
+      setHasUnsavedGatheringTypeChanges(false);
       setShowGatheringTypeSlider(false);
     } catch (error) {
       console.error('Error saving gathering type:', error);
@@ -191,23 +178,23 @@ export default function GatheringSetupScreen() {
   };
 
   const handleDateTime = () => {
-    console.log('Navigate to Date & Time setup');
-    // TODO: Navigate to date & time setup
+    console.log('Opening Date & Time slider');
+    setShowDateTimeSlider(true);
   };
 
   const handleLocation = () => {
-    console.log('Navigate to Location setup');
-    // TODO: Navigate to location setup
+    console.log('Opening Location slider');
+    setShowLocationSlider(true);
   };
 
   const handleMentor = () => {
-    console.log('Navigate to Mentor setup');
-    // TODO: Navigate to mentor setup
+    console.log('Opening Mentor slider');
+    setShowMentorSlider(true);
   };
 
   const handleDescription = () => {
-    console.log('Navigate to Description setup');
-    // TODO: Navigate to description setup
+    console.log('Opening Description slider');
+    setShowDescriptionSlider(true);
   };
 
   // Show loading state during initialization
@@ -289,7 +276,7 @@ export default function GatheringSetupScreen() {
         
         {/* Ideas and FAQ link */}
         <TouchableOpacity style={styles.ideasFAQRow} onPress={handleTipsAndFAQs}>
-          <Text style={styles.ideasFAQText}>Ideas and FAQ ></Text>
+          <Text style={styles.ideasFAQText}>Ideas and FAQ &gt;</Text>
           <Feather name="settings" size={20} color={theme.colors.text.secondary} />
         </TouchableOpacity>
       </View>
@@ -380,16 +367,118 @@ export default function GatheringSetupScreen() {
         </TouchableOpacity>
       </Modal>
 
+      {/* Gathering Type Slider */}
+      <GatheringTypeSlider
+        visible={showGatheringTypeSlider}
+        onClose={() => setShowGatheringTypeSlider(false)}
+        initialData={{
+          experienceType: typeof gatheringDetail?.gathering?.experience_type === 'string' 
+            ? gatheringDetail.gathering.experience_type 
+            : (gatheringDetail?.gathering?.experience_type as any)?.id || '',
+        }}
+        onSave={async (data) => {
+          await saveGatheringData(async () => {
+            // Update gatherings table with selected experience type
+            const { error } = await supabase
+              .from('gatherings')
+              .update({
+                experience_type: data.experienceType
+              })
+              .eq('id', gatheringId);
+
+            if (error) {
+              console.error('Error saving gathering type:', error);
+              throw error;
+            }
+          }, false);
+        }}
+      />
+
       {/* Title and Hosts Slider */}
       <TitleAndHostsSlider
         visible={showTitleAndHostsSlider}
         onClose={() => setShowTitleAndHostsSlider(false)}
-        initialTitle={gatheringDetail?.gathering?.title || ''}
-        initialHosts={gatheringDetail?.gathering?.host || []}
-        initialScribe={gatheringDetail?.gatheringDisplay?.scribe || ''}
-        experienceType={gatheringDetail?.gathering?.experience_type || ''}
-        gyldMembers={gyldMembers || []}
+        initialData={{
+          title: gatheringDetail?.gathering?.title || '',
+          hosts: gatheringDetail?.gathering?.host || [],
+          scribe: gatheringDetail?.gatheringDisplay?.scribe || '',
+        }}
+        experienceType={
+          typeof gatheringDetail?.gathering?.experience_type === 'string' 
+            ? gatheringDetail.gathering.experience_type 
+            : (gatheringDetail?.gathering?.experience_type as any)?.label || ''
+        }
         onSave={handleSaveTitleAndHosts}
+      />
+
+      {/* Date & Time Slider */}
+      <DateTimeSlider
+        visible={showDateTimeSlider}
+        onClose={() => setShowDateTimeSlider(false)}
+        initialData={{
+          startTime: gatheringDetail?.gathering?.start_time ? new Date(gatheringDetail.gathering.start_time) : undefined,
+          endTime: gatheringDetail?.gathering?.end_time ? new Date(gatheringDetail.gathering.end_time) : undefined,
+        }}
+        onSave={async (data) => {
+          await saveGatheringData(async () => {
+            console.log('Saving date/time:', data);
+            // TODO: Implement actual save to database
+          }, false);
+        }}
+      />
+
+      {/* Location Slider */}
+      <LocationSlider
+        visible={showLocationSlider}
+        onClose={() => setShowLocationSlider(false)}
+        initialData={{
+          address: gatheringDetail?.gatheringDisplay?.address || '',
+          isRemote: gatheringDetail?.gatheringOther?.remote || false,
+        }}
+        onSave={async (data) => {
+          await saveGatheringData(async () => {
+            console.log('Saving location:', data);
+            // TODO: Implement actual save to database
+          }, true);
+        }}
+      />
+
+      {/* Mentor Slider */}
+      <MentorSlider
+        visible={showMentorSlider}
+        onClose={() => setShowMentorSlider(false)}
+        initialData={{
+          mentorIds: Array.isArray(gatheringDetail?.gatheringDisplay?.mentor) 
+            ? gatheringDetail.gatheringDisplay.mentor 
+            : (gatheringDetail?.gatheringDisplay?.mentor ? [gatheringDetail.gatheringDisplay.mentor] : []),
+        }}
+        mentorOptions={activeMentors?.map(mentor => ({
+          value: mentor.user_id || mentor.id,
+          label: mentor.full_name || 'Unknown Mentor',
+          expertise: mentor.title || mentor.bio,
+        })) || []}
+        onSave={async (data) => {
+          await saveGatheringData(async () => {
+            console.log('Saving mentors:', data);
+            // TODO: Implement actual save to database
+            // Will save data.mentorIds to gathering_displays.mentor (UUID[])
+          }, true);
+        }}
+      />
+
+      {/* Description Slider */}
+      <DescriptionSlider
+        visible={showDescriptionSlider}
+        onClose={() => setShowDescriptionSlider(false)}
+        initialData={{
+          description: gatheringDetail?.gatheringDisplay?.description || '',
+        }}
+        onSave={async (data) => {
+          await saveGatheringData(async () => {
+            console.log('Saving description:', data);
+            // TODO: Implement actual save to database
+          }, true);
+        }}
       />
     </ScrollView>
   );

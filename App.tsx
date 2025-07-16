@@ -3,11 +3,12 @@ import { NavigationContainer } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { PaperProvider, configureFonts, MD3LightTheme } from 'react-native-paper';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AppNavigator from './src/navigation/AppNavigator';
 import { useAuthStore } from './src/stores';
 import { colors } from './src/styles/colors';
 
-// Configure React Native Paper theme with brand colors
+// Configure React Native Paper to use @expo/vector-icons
 const paperTheme = {
   ...MD3LightTheme,
   colors: {
@@ -22,6 +23,11 @@ const paperTheme = {
   },
 };
 
+// Configure icons for React Native Paper
+const settings = {
+  icon: (props: any) => <MaterialCommunityIcons {...props} />,
+};
+
 export default function App() {
   const initialize = useAuthStore(state => state.initialize);
 
@@ -32,7 +38,7 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <PaperProvider theme={paperTheme}>
+      <PaperProvider theme={paperTheme} settings={settings}>
         <NavigationContainer>
           <AppNavigator />
           <StatusBar style="auto" />

@@ -144,7 +144,7 @@ export const globalStyles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border.light,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
+    paddingVertical: 6, // Reduced from 10 to 6
     fontSize: typography.sizes.md,
     color: colors.text.primary,
     minHeight: layout.components.input.height,
