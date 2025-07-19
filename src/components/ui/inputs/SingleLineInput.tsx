@@ -100,7 +100,7 @@ const SingleLineInput = (props: SingleLineInputProps) => {
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: theme.spacing.sm,
+    marginBottom: 0,
   },
   input: {
     minHeight: 60,

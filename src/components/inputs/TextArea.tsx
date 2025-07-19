@@ -43,7 +43,7 @@ export const TextArea = (props: MultiLineInputProps) => (
     numberOfLines={4}
     minHeight={112}
     maxHeight={200}
-    showCharacterCount={true}
+    showCharacterCount={false}
     style={[
       { 
         marginBottom: theme.spacing.md,

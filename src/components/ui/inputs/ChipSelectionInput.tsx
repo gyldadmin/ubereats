@@ -279,7 +279,7 @@ export default function ChipSelectionInput<T = any>({
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: theme.spacing.md,
+    marginBottom: 0,
   },
   label: {
     fontSize: theme.typography.sizes.md,

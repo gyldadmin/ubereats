@@ -9,7 +9,6 @@ import type { GatheringCardData } from '../hooks/useHomeGatherings';
 import { 
   Input, 
   TextArea, 
-  Dropdown, 
   MultiSelect, 
   SegmentedInput, 
   ChipSelection, 
@@ -20,6 +19,7 @@ import {
   SearchableDropdown,
   EventDateTimePicker 
 } from '../components/inputs';
+import { ImageUpload } from '../components/ui';
 
 // Constants for expandable list behavior
 const INITIAL_VISIBLE_COUNT = 3;
@@ -215,7 +215,7 @@ export default function HomeScreen() {
           <View style={styles.tempButtonGrid}>
             <TouchableOpacity
               style={styles.tempButton}
-              onPress={() => (navigation as any).navigate('GatheringSetup')}
+              onPress={() => (navigation as any).navigate('GatheringSetup', { mentoring: true })}
             >
               <Text style={styles.tempButtonText}>Setup</Text>
             </TouchableOpacity>
@@ -267,7 +267,6 @@ const InputTestingSection = () => {
   const [textAreaValue, setTextAreaValue] = useState('');
   const [nativeDateValue, setNativeDateValue] = useState<Date>(new Date());
 
-  const [dropdownValue, setDropdownValue] = useState<string | undefined>(undefined);
   const [multiSelectValue, setMultiSelectValue] = useState<string[]>([]);
   const [segmentedValue, setSegmentedValue] = useState<string>('');
   const [chipSelectionValue, setChipSelectionValue] = useState<string[]>([]);
@@ -296,6 +295,7 @@ const InputTestingSection = () => {
 
   const [eventStartTime, setEventStartTime] = useState<Date>(createDefaultStartTime());
   const [eventEndTime, setEventEndTime] = useState<Date>(createDefaultEndTime());
+  const [imageValue, setImageValue] = useState<string | null>(null);
 
   // Remove these dropdown picker state variables:
   // const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -303,12 +303,6 @@ const InputTestingSection = () => {
 
   // Remove the searchableDropdownOptions array:
   // const searchableDropdownOptions = [...];
-
-  const dropdownOptions = [
-    { value: 'option1', label: 'Option 1' },
-    { value: 'option2', label: 'Option 2' },
-    { value: 'option3', label: 'Option 3' },
-  ];
 
   const multiSelectOptions = [
     { value: 'item1', label: 'Item 1' },
@@ -362,6 +356,13 @@ const InputTestingSection = () => {
         onEndTimeChange={setEventEndTime}
       />
       
+      <ImageUpload
+        label="Image Upload"
+        value={imageValue}
+        onValueChange={setImageValue}
+        placeholder="Add an image"
+      />
+      
       <Input
         label="label"
         value={inputValue}
@@ -377,14 +378,8 @@ const InputTestingSection = () => {
         maxLength={200}
       />
       
-      <Dropdown
-        label="Dropdown"
-        value={dropdownValue}
-        onValueChange={setDropdownValue}
-        options={dropdownOptions}
-      />
-      
       <MultiSelect
+                        label="Multi-Select"
         options={multiSelectOptions}
         selectedValues={multiSelectValue}
         onSelectionChange={setMultiSelectValue}
@@ -430,15 +425,15 @@ const InputTestingSection = () => {
         label="Paper Dropdown"
         value={paperDropdownValue}
         onValueChange={setPaperDropdownValue}
-        options={dropdownOptions}
+        options={multiSelectOptions}
         placeholder="Select an option"
       />
 
       <SearchableDropdown
-        label="Searchable Dropdown"
+                        label="Searchable Dropdown"
+        options={searchableDropdownOptions}
         value={searchableDropdownValue}
         onValueChange={setSearchableDropdownValue}
-        options={searchableDropdownOptions}
         placeholder="Search fruits..."
       />
 

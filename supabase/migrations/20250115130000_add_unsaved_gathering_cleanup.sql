@@ -4,15 +4,31 @@
 -- Create cleanup function for unsaved gatherings
 CREATE OR REPLACE FUNCTION cleanup_unsaved_gatherings()
 RETURNS void AS $$
+DECLARE
+  gathering_ids UUID[];
 BEGIN
-  -- Delete gatherings with "unsaved" status older than 24 hours
-  -- Cascade deletes will handle any related satellites automatically
+  -- First, get the IDs of gatherings to be deleted
+  SELECT ARRAY(
+    SELECT id 
+    FROM gatherings 
+    WHERE gathering_status = (SELECT id FROM gathering_status WHERE label = 'unsaved')
+    AND created_at < NOW() - INTERVAL '24 hours'
+  ) INTO gathering_ids;
+  
+  -- Delete satellite records first to maintain referential integrity
+  DELETE FROM gathering_displays 
+  WHERE gathering_id = ANY(gathering_ids);
+  
+  DELETE FROM gathering_other 
+  WHERE gathering = ANY(gathering_ids);
+  
+  -- Finally, delete the main gathering records
   DELETE FROM gatherings 
   WHERE gathering_status = (SELECT id FROM gathering_status WHERE label = 'unsaved')
   AND created_at < NOW() - INTERVAL '24 hours';
   
   -- Log the cleanup action
-  RAISE LOG 'Cleaned up unsaved gatherings older than 24 hours';
+  RAISE LOG 'Cleaned up % unsaved gatherings and their satellites older than 24 hours', array_length(gathering_ids, 1);
 END;
 $$ LANGUAGE plpgsql;
 

@@ -1,194 +1,437 @@
 import React, { useState, useEffect } from 'react';
-import { View } from 'react-native';
-import { Text, useTheme } from 'react-native-paper';
-import StandardSlider from './StandardSlider';
-import SingleLineInput from './SingleLineInput';
-import { MultiSelect } from './AdvancedMultiSelect';
-import SingleChoiceSelector from './SingleChoiceSelector';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { theme } from '../../styles/theme';
+import { SingleLineInput, MultiSelect } from './inputs';
+import { SearchableDropdown } from './SearchableDropdown';
+import { ImageUpload } from './ImageUpload';
 import { useGyldMembers } from '../../hooks/useGyldMembers';
-import { typography, colors, spacing } from '../../styles/theme';
+
+interface TitleHostsData {
+  title: string;
+  scribe?: string; // User ID of selected scribe
+  hosts: string[]; // Array of user IDs
+  image?: string; // Image URL
+}
 
 interface TitleAndHostsSliderProps {
   visible: boolean;
   onClose: () => void;
-  onSave: (data: {
-    title: string;
-    hosts: string[];
-    scribe?: string;
-  }) => Promise<void>;
-  experienceType?: string;
-  initialData?: {
-    title?: string;
-    hosts?: string[];
-    scribe?: string;
-  };
+  initialData?: TitleHostsData;
+  onSave: (data: TitleHostsData) => Promise<void>;
+  experienceType?: string; // To determine if scribe field should be visible
 }
 
 export const TitleAndHostsSlider: React.FC<TitleAndHostsSliderProps> = ({
   visible,
   onClose,
+  initialData,
   onSave,
   experienceType,
-  initialData,
 }) => {
-  const theme = useTheme();
-  const { members: gyldMembers, loading: membersLoading } = useGyldMembers();
+  // Form state
+  const [title, setTitle] = useState(initialData?.title || '');
+  const [scribe, setScribe] = useState(initialData?.scribe || '');
+  const [hosts, setHosts] = useState<string[]>(initialData?.hosts || []);
+  const [image, setImage] = useState<string | null>(initialData?.image || null);
   
-  const [formData, setFormData] = useState({
-    title: initialData?.title || '',
-    hosts: initialData?.hosts || [],
-    scribe: initialData?.scribe || '',
-  });
+  // UI state
+  const [saving, setSaving] = useState(false);
+  const [showHosts, setShowHosts] = useState(false);
+  const [showImage, setShowImage] = useState(false);
+  const [userHasPressedAddHosts, setUserHasPressedAddHosts] = useState(false);
+  const [userHasPressedAddImage, setUserHasPressedAddImage] = useState(false);
 
-  // Update form data when initialData changes
+  // Get gyld members for dropdowns
+  const { members: gyldMembers, loading: membersLoading, error: membersError } = useGyldMembers();
+
+  // Initialize form when modal opens
   useEffect(() => {
-    setFormData({
-      title: initialData?.title || '',
-      hosts: initialData?.hosts || [],
-      scribe: initialData?.scribe || '',
-    });
-  }, [initialData]);
+    if (visible) {
+      console.log('🚀 TitleAndHostsSlider opened, initialData:', initialData);
+      setTitle(initialData?.title || '');
+      setScribe(initialData?.scribe || '');
+      setHosts(initialData?.hosts || []);
+      setImage(initialData?.image || null);
+      
+      // Set button pressed states based on existing data
+      // Only set userHasPressedAddHosts to true if there are multiple hosts (>1)
+      setUserHasPressedAddHosts((initialData?.hosts?.length || 0) > 1);
+      setUserHasPressedAddImage(!!initialData?.image);
+      
+      // Let the computed logic handle visibility automatically
+    }
+  }, [visible, initialData]);
 
-  // Prepare options for member selectors
-  // Transform gyldMembers to the format expected by MultiSelect
-  const hostOptions = (gyldMembers || []).map(member => ({
+  // Check if scribe field should be visible (only for Mentoring experience type)
+  const shouldShowScribe = experienceType?.toLowerCase() === 'mentoring';
+
+  // Computed visibility logic
+  const shouldShowHosts = hosts.length > 1 || userHasPressedAddHosts;
+  const shouldShowImage = (image !== null && image !== '') || userHasPressedAddImage;
+
+  // Update showHosts and showImage based on computed logic
+  React.useEffect(() => {
+    setShowHosts(shouldShowHosts);
+    setShowImage(shouldShowImage);
+  }, [shouldShowHosts, shouldShowImage]);
+
+  // Check if there are unsaved changes
+  const hasUnsavedChanges = 
+    title !== (initialData?.title || '') ||
+    scribe !== (initialData?.scribe || '') ||
+    JSON.stringify(hosts.sort()) !== JSON.stringify((initialData?.hosts || []).sort()) ||
+    image !== (initialData?.image || null);
+
+  // No validation required - save button only checks for changes
+
+  // Transform gyld members to dropdown options
+  const memberOptions = gyldMembers.map(member => ({
     value: member.user_id,
-    label: member.full_name,
+    label: member.full_name || `${member.first} ${member.last}`.trim() || 'Unknown Member'
   }));
 
-  // Debug logging
-  console.log('🎯 TitleAndHostsSlider debug:');
-  console.log('- gyldMembers count:', gyldMembers?.length || 0);
-  console.log('- gyldMembers sample:', gyldMembers?.slice(0, 2) || []);
-  console.log('- membersLoading:', membersLoading);
-  console.log('- hostOptions count:', hostOptions.length);
-  console.log('- hostOptions sample:', hostOptions.slice(0, 2));
+  const handleSave = async () => {
+    if (!hasUnsavedChanges) return;
+    
+    setSaving(true);
+    try {
+      console.log('💾 Saving title and hosts data...');
+      const dataToSave: TitleHostsData = {
+        title: title.trim(),
+        hosts,
+        ...(shouldShowScribe && { scribe }),
+        ...(image && { image })
+      };
+      
+      await onSave(dataToSave);
+      console.log('✅ Save completed, closing modal');
+      onClose();
+    } catch (error) {
+      console.error('❌ Error saving title and hosts:', error);
+      // Could add error state/toast here
+    } finally {
+      setSaving(false);
+    }
+  };
 
-  // Prepare options for scribe selector (single choice)
-  const scribeOptions = (gyldMembers || []).map(member => ({
-    value: member.user_id,
-    label: member.full_name,
-  }));
+  const handleClose = () => {
+    console.log('🚪 TitleAndHostsSlider handleClose called');
+    onClose();
+  };
 
-  // Check if current data has unsaved changes
-  const hasUnsavedChanges = () => {
+  // Handle showing hosts section
+  const handleShowHosts = () => {
+    console.log('👥 Showing hosts section');
+    setUserHasPressedAddHosts(true);
+  };
+
+  // Handle showing image section  
+  const handleShowImage = () => {
+    console.log('🖼️ Showing image section');
+    setUserHasPressedAddImage(true);
+  };
+
+  // Render the toggle links for hidden sections
+  const renderToggleLinks = () => {
+    const hostsHidden = !shouldShowHosts;
+    const imageHidden = !shouldShowImage;
+    
+    // If both are visible, no button needed
+    if (!hostsHidden && !imageHidden) {
+      return null;
+    }
+    
+    const links = [];
+    
+    if (hostsHidden) {
+      links.push({
+        text: 'Add Co-Hosts',
+        onPress: handleShowHosts,
+      });
+    }
+    
+    if (imageHidden) {
+      links.push({
+        text: 'Add Image',
+        onPress: handleShowImage,
+      });
+    }
+
     return (
-      formData.title !== (initialData?.title || '') ||
-      JSON.stringify(formData.hosts.sort()) !== JSON.stringify((initialData?.hosts || []).sort()) ||
-      formData.scribe !== (initialData?.scribe || '')
+      <View style={styles.toggleLinksContainer}>
+        {links.map((link, index) => (
+          <TouchableOpacity
+            key={link.text}
+            onPress={link.onPress}
+            style={styles.toggleLink}
+          >
+            <Text style={styles.toggleLinkText}>
+              {link.text}
+              {index < links.length - 1 && ' • '}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
     );
   };
 
-  // Validate form data
-  const validateForm = () => {
-    const errors: string[] = [];
-    
-    if (!formData.title.trim()) {
-      errors.push('Title is required');
-    }
-    
-    if (formData.title.length > 32) {
-      errors.push('Title must be 32 characters or less');
-    }
-    
-    if (formData.hosts.length === 0) {
-      errors.push('At least one host is required');
-    }
-    
-    return errors;
-  };
+  if (!visible) {
+    return null;
+  }
 
-  const handleSave = async () => {
-    const errors = validateForm();
-    if (errors.length > 0) {
-      throw new Error(errors.join(', '));
-    }
-    
-    await onSave({
-      title: formData.title.trim(),
-      hosts: formData.hosts,
-      scribe: formData.scribe || undefined,
-    });
-  };
-
-  const handleTitleChange = (value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      title: value,
-    }));
-  };
-
-  const handleHostsChange = (selectedHosts: string[]) => {
-    setFormData(prev => ({
-      ...prev,
-      hosts: selectedHosts,
-    }));
-  };
-
-  const handleScribeChange = (selectedScribe: string) => {
-    setFormData(prev => ({
-      ...prev,
-      scribe: selectedScribe,
-    }));
-  };
-
-  // Show scribe field only for Mentoring experience type
-  const showScribeField = experienceType === 'Mentoring';
+  console.log('🎨 TitleAndHostsSlider rendering...');
 
   return (
-    <StandardSlider
-      visible={visible}
-      onClose={onClose}
-      onSave={handleSave}
-      hasUnsavedChanges={hasUnsavedChanges()}
-      title="Title"
+    <Modal 
+      visible={visible} 
+      animationType="slide" 
+      presentationStyle="pageSheet"
+      onRequestClose={handleClose}
     >
-      <View>
-        {/* Title input */}
-        <SingleLineInput
-          label="Title"
-          value={formData.title}
-          onValueChange={handleTitleChange}
-          placeholder="Type gathering title..."
-          maxLength={32}
-          required
-        />
-
-        {/* Hosts section label */}
-        <Text style={styles.sectionLabel}>Hosts</Text>
+      <View style={styles.modalContainer}>
+        {/* Header with X button and centered title */}
+        <View style={styles.modalHeader}>
+          <View style={styles.headerContent}>
+            {/* Left spacer to balance the X button */}
+            <View style={styles.headerSpacer} />
+            
+            {/* Centered title */}
+            <Text style={styles.headerTitle}>Title & Hosts</Text>
+            
+            {/* X button */}
+            <TouchableOpacity 
+              onPress={handleClose}
+              style={styles.modalCloseButton}
+            >
+              <Ionicons name="close" size={24} color={theme.colors.text.primary} />
+            </TouchableOpacity>
+          </View>
+        </View>
         
-        {/* Hosts selection */}
-        <MultiSelect
-          title="Select Hosts"
-          options={hostOptions}
-          selectedValues={formData.hosts}
-          onSelectionChange={handleHostsChange}
-          placeholder="Choose hosts..."
-          disabled={membersLoading}
-        />
+        {/* Content with scrolling capability */}
+        <View style={styles.contentContainer}>
+          <ScrollView 
+            style={styles.modalContent}
+            showsVerticalScrollIndicator={true}
+            contentContainerStyle={styles.scrollContent}
+          >
+            {/* Gathering Title - Always visible */}
+            <SingleLineInput
+              label="Gathering Title"
+              value={title}
+              onValueChange={setTitle}
+              placeholder="Enter gathering title"
+              maxLength={32}
+              required
+            />
 
-        {/* Scribe selection - only for Mentoring */}
-        {showScribeField && (
-          <SingleChoiceSelector
-            label="Scribe (Optional)"
-            options={scribeOptions}
-            selectedValue={formData.scribe}
-            onValueChange={handleScribeChange}
-            placeholder="Choose scribe..."
-            disabled={membersLoading}
-          />
-        )}
+            {/* Scribe - Only visible for Mentoring */}
+            {shouldShowScribe && (
+              <SearchableDropdown
+                label="Scribe (records knowledge from the salon)"
+                options={memberOptions}
+                value={scribe}
+                onValueChange={setScribe}
+                placeholder="Select a scribe (optional)"
+              />
+            )}
+
+            {/* Hosts - Progressive disclosure */}
+            {showHosts && (
+              <MultiSelect
+                title="Select Co-Hosts"
+                label="Hosts"
+                options={memberOptions}
+                selectedValues={hosts}
+                onSelectionChange={setHosts}
+                placeholder="Select hosts"
+              />
+            )}
+
+            {/* Image Upload - Progressive disclosure */}
+            {showImage && (
+                          <ImageUpload
+              label="Gathering Image"
+              value={image}
+              onValueChange={(url) => setImage(url)}
+              placeholder="Gathering Image"
+            />
+            )}
+
+            {/* Toggle links for hidden sections */}
+            {renderToggleLinks()}
+
+            {/* Loading states */}
+            {membersLoading && (
+              <View style={styles.loadingContainer}>
+                <Text style={styles.loadingText}>Loading members...</Text>
+              </View>
+            )}
+
+            {/* Error states */}
+            {membersError && (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>{membersError}</Text>
+              </View>
+            )}
+
+            {/* Extra padding at bottom for floating buttons */}
+            <View style={styles.bottomPadding} />
+          </ScrollView>
+        </View>
+
+        {/* Fixed bottom buttons - floating over scrolling content */}
+        <View style={styles.modalButtons}>
+          <TouchableOpacity 
+            style={styles.cancelButton}
+            onPress={handleClose}
+          >
+            <Text style={styles.cancelButtonText}>Cancel</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[
+              styles.saveButton,
+              !hasUnsavedChanges && styles.saveButtonInactive
+            ]}
+            onPress={handleSave}
+            disabled={!hasUnsavedChanges || saving}
+          >
+            <Text style={[
+              styles.saveButtonText,
+              !hasUnsavedChanges && styles.saveButtonTextInactive
+            ]}>
+              {saving ? 'Saving...' : 'Save'}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
-    </StandardSlider>
+    </Modal>
   );
 };
 
-const styles = {
-  sectionLabel: {
-    fontSize: typography.sizes.lg,
-    fontWeight: typography.weights.bold,
-    color: colors.text.primary,
-    marginTop: 32, // Fixed pixels above titles
-    marginBottom: 16, // Fixed pixels below titles
+const styles = StyleSheet.create({
+  // Modal styles - matching other sliders
+  modalContainer: {
+    flex: 1,
+    backgroundColor: theme.colors.background.secondary,
   },
-}; 
+  modalHeader: {
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.lg,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  headerSpacer: {
+    width: 24 + (theme.spacing.sm * 2), // Same width as close button + padding
+  },
+  headerTitle: {
+    fontSize: theme.typography.sizes.lg,
+    fontWeight: theme.typography.weights.bold,
+    color: theme.colors.text.primary,
+    textAlign: 'center',
+    flex: 1,
+  },
+  modalCloseButton: {
+    padding: theme.spacing.sm,
+  },
+  contentContainer: {
+    flex: 1,
+  },
+  modalContent: {
+    flex: 1,
+    paddingHorizontal: theme.spacing.lg,
+  },
+  scrollContent: {
+    paddingBottom: 120, // Extra space for floating buttons
+    gap: theme.spacing.input_spacing, // 54px spacing between all elements
+  },
+
+  // Toggle links for progressive disclosure
+  toggleLinksContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginVertical: 16,
+  },
+  toggleLink: {
+    // No additional styling needed, touchable area
+  },
+  toggleLinkText: {
+    color: theme.colors.text.tertiary, // Light gray like More button
+    fontSize: 14,
+    fontWeight: '500',
+  },
+
+  // Loading and error states
+  loadingContainer: {
+    paddingVertical: 20,
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 14,
+    color: theme.colors.text.secondary,
+  },
+  errorContainer: {
+    paddingVertical: 20,
+    alignItems: 'center',
+  },
+  errorText: {
+    fontSize: 14,
+    color: theme.colors.status?.error || '#d32f2f',
+    textAlign: 'center',
+  },
+  bottomPadding: {
+    height: 20,
+  },
+
+  // Fixed bottom buttons - floating over scrolling content
+  modalButtons: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    padding: theme.spacing.lg + 20,
+    gap: theme.spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border.light,
+    backgroundColor: theme.colors.background.secondary,
+    alignItems: 'center',
+  },
+  cancelButton: {
+    flex: 1,
+    backgroundColor: theme.colors.background.tertiary,
+    borderRadius: theme.spacing.md,
+    paddingVertical: theme.spacing.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelButtonText: {
+    fontSize: theme.typography.sizes.md,
+    fontWeight: theme.typography.weights.medium,
+    color: theme.colors.text.secondary,
+  },
+  saveButton: {
+    flex: 1,
+    backgroundColor: theme.colors.primary,
+    borderRadius: theme.spacing.md,
+    paddingVertical: theme.spacing.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  saveButtonInactive: {
+    backgroundColor: 'rgba(19, 190, 199, 0.35)',
+  },
+  saveButtonText: {
+    fontSize: theme.typography.sizes.md,
+    fontWeight: theme.typography.weights.semibold,
+    color: theme.colors.text.inverse,
+  },
+  saveButtonTextInactive: {
+    color: theme.colors.text.secondary,
+  },
+}); 

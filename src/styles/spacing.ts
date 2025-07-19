@@ -12,6 +12,7 @@ export const spacing = {
   xl: 20,     // 20px - current header spacing
   xxl: 24,    // 24px
   xxxl: 32,   // 32px
+  input_spacing: 40,  // 27px - spacing between input components
 
   // Semantic spacing
   component: {

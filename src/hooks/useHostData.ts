@@ -24,7 +24,7 @@ export const useHostData = (routeParams?: any) => {
   const [gatheringId, setGatheringId] = useState<string | null>(null);
   const [initializationLoading, setInitializationLoading] = useState(false);
   const [initializationError, setInitializationError] = useState<string | null>(null);
-
+  
   // Initialize gathering based on route params
   const initializeGathering = useCallback(async () => {
     // Skip if we already have a gathering ID
@@ -48,7 +48,8 @@ export const useHostData = (routeParams?: any) => {
         const { data, error } = await createUnsavedGathering(
           userGyld,
           user.id,
-          routeParams?.experienceType // Optional experience_type from route
+          routeParams?.experienceType, // Optional experience_type from route
+          routeParams?.mentoring // Optional mentoring mode flag
         );
 
         if (error) {
@@ -155,6 +156,9 @@ export const useHostData = (routeParams?: any) => {
     plannedWorkflows: plannedWorkflows.workflows,
   };
 
+  // Mentoring mode is driven by route params
+  const mentoring = routeParams?.mentoring || false;
+
   return {
     // Individual data sets
     gatheringDetail: gatheringDetail.gatheringDetail,
@@ -176,5 +180,8 @@ export const useHostData = (routeParams?: any) => {
     // Actions
     refresh,
     saveGatheringData, // Convenience function for setup screens
+    
+    // Mentoring mode flag
+    mentoring, // Boolean indicating if this is a mentoring gathering without a start_time
   };
 }; 

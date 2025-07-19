@@ -6,19 +6,91 @@ import {
   SetupItemKey 
 } from '../types/gatheringSetup';
 
+// Import the GatheringDetailData type
+import { GatheringDetailData } from './useGatheringDetail';
+
 /**
  * Main hook for managing gathering setup state across all setup items
  * Handles individual setup item states and determines launch readiness
  */
-export const useGatheringSetup = (gatheringId?: string) => {
+export const useGatheringSetup = (gatheringId?: string, gatheringDetail?: GatheringDetailData) => {
+  
+  // Calculate dateTime status based on gathering data
+  const calculateDateTimeStatus = (): SetupItemStatus => {
+    if (!gatheringDetail?.gathering?.start_time) {
+      return SetupItemStatus.INCOMPLETE;
+    }
+    return SetupItemStatus.COMPLETE;
+  };
+
+  // Calculate location status based on complex business rules
+  const calculateLocationStatus = (): SetupItemStatus => {
+    const remote = gatheringDetail?.gatheringOther?.remote;
+    const address = gatheringDetail?.gatheringDisplay?.address;
+    const meetingLink = gatheringDetail?.gatheringDisplay?.meeting_link;
+    const locationTbd = gatheringDetail?.gatheringOther?.location_tbd;
+
+    if (remote === false) {
+      // In-person gathering logic
+      if (address && address.trim() !== '') {
+        return SetupItemStatus.COMPLETE;
+      } else if (locationTbd === true) {
+        return SetupItemStatus.COMPLETE_TBD;
+      } else {
+        return SetupItemStatus.INCOMPLETE;
+      }
+    } else if (remote === true) {
+      // Remote gathering logic
+      if (meetingLink && meetingLink.trim() !== '') {
+        return SetupItemStatus.COMPLETE;
+      } else {
+        return SetupItemStatus.INCOMPLETE;
+      }
+    }
+
+    // Default case (if remote is undefined/null)
+    return SetupItemStatus.INCOMPLETE;
+  };
+
   const [setupState, setSetupState] = useState<GatheringSetupState>({
     gatheringType: { status: SetupItemStatus.COMPLETE }, // Example: already completed
     titleAndHosts: { status: SetupItemStatus.COMPLETE }, // Example: already completed
-    dateTime: { status: SetupItemStatus.INCOMPLETE },
-    location: { status: SetupItemStatus.COMPLETE }, // Example: already completed
+    dateTime: { status: calculateDateTimeStatus() }, // Dynamic calculation
+    location: { status: calculateLocationStatus() }, // Dynamic calculation
     mentor: { status: SetupItemStatus.INCOMPLETE },
     description: { status: SetupItemStatus.INCOMPLETE },
   });
+  
+  // Update dateTime status whenever gatheringDetail changes
+  const currentDateTimeStatus = useMemo(() => {
+    return calculateDateTimeStatus();
+  }, [gatheringDetail?.gathering?.start_time]);
+
+  // Update location status whenever relevant gathering data changes
+  const currentLocationStatus = useMemo(() => {
+    return calculateLocationStatus();
+  }, [
+    gatheringDetail?.gatheringOther?.remote,
+    gatheringDetail?.gatheringDisplay?.address,
+    gatheringDetail?.gatheringDisplay?.meeting_link,
+    gatheringDetail?.gatheringOther?.location_tbd
+  ]);
+  
+  // Update setupState when dateTime status changes
+  useMemo(() => {
+    setSetupState(prev => ({
+      ...prev,
+      dateTime: { status: currentDateTimeStatus }
+    }));
+  }, [currentDateTimeStatus]);
+
+  // Update setupState when location status changes
+  useMemo(() => {
+    setSetupState(prev => ({
+      ...prev,
+      location: { status: currentLocationStatus }
+    }));
+  }, [currentLocationStatus]);
   
   // Update individual setup item status and data
   const updateSetupItem = (

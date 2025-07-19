@@ -28,7 +28,8 @@ export default function GatheringSetupScreen() {
     initializationLoading, // Loading state for gathering creation/loading
     initializationError,  // Error state for gathering creation/loading
     refresh,              // Function to refresh all data
-    saveGatheringData     // Convenience function for saving with satellite creation and status promotion
+    saveGatheringData,    // Convenience function for saving with satellite creation and status promotion
+    mentoring,            // Boolean indicating if this is mentoring mode
   } = useHostData(route.params);
 
   // Setup state management
@@ -40,7 +41,7 @@ export default function GatheringSetupScreen() {
     completedCount,
     totalCount,
     completionPercentage
-  } = useGatheringSetup(gatheringId);
+  } = useGatheringSetup(gatheringId, gatheringDetail);
 
   // Modal states
   const [showGatheringTypeSlider, setShowGatheringTypeSlider] = useState(false);
@@ -49,10 +50,6 @@ export default function GatheringSetupScreen() {
   const [showLocationSlider, setShowLocationSlider] = useState(false);
   const [showMentorSlider, setShowMentorSlider] = useState(false);
   const [showDescriptionSlider, setShowDescriptionSlider] = useState(false);
-  const [showSaveChangesPopup, setShowSaveChangesPopup] = useState(false);
-
-  // Simple state for gathering type changes tracking
-  const [hasUnsavedGatheringTypeChanges, setHasUnsavedGatheringTypeChanges] = useState(false);
 
   const handleTipsAndFAQs = () => {
     (navigation as any).navigate('GatheringResources');
@@ -60,70 +57,24 @@ export default function GatheringSetupScreen() {
 
   const handleGatheringType = () => {
     console.log('Opening Gathering Type slider');
+    console.log('Current showGatheringTypeSlider state:', showGatheringTypeSlider);
+    
+    // Close all other modals first to prevent conflicts
+    setShowTitleAndHostsSlider(false);
+    setShowDateTimeSlider(false);
+    setShowLocationSlider(false);
+    setShowMentorSlider(false);
+    setShowDescriptionSlider(false);
+    
+    // Then open the GatheringTypeSlider
     setShowGatheringTypeSlider(true);
+    console.log('Setting showGatheringTypeSlider to true');
   };
 
   // Handle gathering type slider close
   const handleCloseGatheringTypeSlider = () => {
-    if (hasUnsavedGatheringTypeChanges) {
-      setShowSaveChangesPopup(true);
-    } else {
-      setShowGatheringTypeSlider(false);
-    }
-  };
-
-  // Handle save changes popup responses
-  const handleSaveChanges = () => {
-    // Save the data
-    setHasUnsavedGatheringTypeChanges(false);
-    setShowSaveChangesPopup(false);
+    console.log('Closing Gathering Type slider');
     setShowGatheringTypeSlider(false);
-  };
-
-  const handleDiscardChanges = () => {
-    // Reset form data to saved state
-    setHasUnsavedGatheringTypeChanges(false);
-    setShowSaveChangesPopup(false);
-    setShowGatheringTypeSlider(false);
-  };
-
-  // Handle gathering type save button
-  const handleSaveGatheringType = async () => {
-    try {
-      // Use the convenience function that handles satellites and status promotion
-      await saveGatheringData(async () => {
-        // TODO: Implement actual gathering type save to database
-        // This will save to the main gatherings table: { experience_type: selectedType }
-        console.log('Gathering type saved');
-      }, false); // gathering_type doesn't require satellites
-      
-      setHasUnsavedGatheringTypeChanges(false);
-      setShowGatheringTypeSlider(false);
-    } catch (error) {
-      console.error('Error saving gathering type:', error);
-      // TODO: Show error message to user
-    }
-  };
-
-  /**
-   * Example of how other setup items will use saveGatheringData:
-   * 
-   * Title/Hosts: saveGatheringData(() => supabase.from('gatherings').update({title, host}), false)
-   * Date/Time: saveGatheringData(() => supabase.from('gatherings').update({start_time, end_time}), false) 
-   * Location: saveGatheringData(() => supabase.from('gathering_displays').update({address}), true)
-   * Mentor: saveGatheringData(() => supabase.from('gathering_displays').update({mentor}), true)
-   * Description: saveGatheringData(() => supabase.from('gathering_displays').update({description}), true)
-   * 
-   * The function automatically:
-   * 1. Creates gathering_displays/gathering_other if requiresSatellites=true
-   * 2. Executes your save function
-   * 3. Promotes status from "unsaved" to "pre-launch" (only on first save)
-   * 4. Refreshes gathering data to show updates
-   */
-
-  // Handle gathering type cancel button
-  const handleCancelGatheringType = () => {
-    handleCloseGatheringTypeSlider();
   };
 
   const handleBasicInfo = () => {
@@ -135,7 +86,8 @@ export default function GatheringSetupScreen() {
   const handleSaveTitleAndHosts = async (data: {
     title: string;
     hosts: string[];
-    scribe: string;
+    scribe?: string;
+    image?: string;
   }) => {
     try {
       await saveGatheringData(async () => {
@@ -153,13 +105,15 @@ export default function GatheringSetupScreen() {
           throw gatheringError;
         }
 
-        // Update gathering_displays table with scribe (only if scribe is provided)
-        if (data.scribe) {
+        // Update gathering_displays table with scribe and/or image (if provided)
+        if (data.scribe || data.image) {
+          const updateData: any = {};
+          if (data.scribe) updateData.scribe = data.scribe;
+          if (data.image) updateData.image = data.image;
+
           const { error: displayError } = await supabase
             .from('gathering_displays')
-            .update({
-              scribe: data.scribe
-            })
+            .update(updateData)
             .eq('gathering_id', gatheringId);
 
           if (displayError) {
@@ -168,8 +122,24 @@ export default function GatheringSetupScreen() {
           }
         }
 
+        // If gathering status is 'unsaved', change it to 'pre-launch'
+        if (gatheringDetail?.gathering?.gathering_status?.label === 'unsaved') {
+          console.log('📋 Changing gathering status from unsaved to pre-launch');
+          const { error: statusError } = await supabase
+            .from('gatherings')
+            .update({
+              gathering_status: 'pre-launch'
+            })
+            .eq('id', gatheringId);
+
+          if (statusError) {
+            console.error('Error updating gathering status:', statusError);
+            throw statusError;
+          }
+        }
+
         console.log('Title and hosts saved successfully:', data);
-      }, data.scribe ? true : false); // Require satellites if scribe is provided
+      }, (data.scribe || data.image) ? true : false); // Require satellites if scribe or image is provided
       
     } catch (error) {
       console.error('Error saving title and hosts:', error);
@@ -281,96 +251,10 @@ export default function GatheringSetupScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Gathering Type Slider Modal */}
-      <Modal
-        visible={showGatheringTypeSlider}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={handleCloseGatheringTypeSlider}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <TouchableOpacity 
-              onPress={handleCloseGatheringTypeSlider}
-              style={styles.modalCloseButton}
-            >
-              <Ionicons name="close" size={24} color={theme.colors.text.primary} />
-            </TouchableOpacity>
-          </View>
-          
-          <ScrollView style={styles.modalContent}>
-            {/* Content will be replaced with actual inputs */}
-          </ScrollView>
-
-          {/* Fixed bottom buttons */}
-          <View style={styles.modalButtons}>
-            <TouchableOpacity 
-              style={styles.cancelButton}
-              onPress={handleCancelGatheringType}
-            >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={[
-                styles.saveButton,
-                !hasUnsavedGatheringTypeChanges && styles.saveButtonInactive
-              ]}
-              onPress={handleSaveGatheringType}
-              disabled={!hasUnsavedGatheringTypeChanges}
-            >
-              <Text style={[
-                styles.saveButtonText,
-                !hasUnsavedGatheringTypeChanges && styles.saveButtonTextInactive
-              ]}>
-                Save
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Save Changes Confirmation Popup */}
-      <Modal
-        visible={showSaveChangesPopup}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowSaveChangesPopup(false)}
-      >
-        <TouchableOpacity 
-          style={styles.popupOverlay} 
-          activeOpacity={1} 
-          onPress={() => setShowSaveChangesPopup(false)}
-        >
-          <View style={styles.popupContainer}>
-            <Text style={styles.popupTitle}>Save Changes?</Text>
-            <Text style={styles.popupMessage}>
-              You have unsaved changes that will be lost if you continue.
-            </Text>
-            
-            <View style={styles.popupButtons}>
-              <TouchableOpacity 
-                style={styles.popupNoButton}
-                onPress={handleDiscardChanges}
-              >
-                <Text style={styles.popupNoButtonText}>No</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={styles.popupYesButton}
-                onPress={handleSaveChanges}
-              >
-                <Text style={styles.popupYesButtonText}>Yes</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </TouchableOpacity>
-      </Modal>
-
       {/* Gathering Type Slider */}
       <GatheringTypeSlider
         visible={showGatheringTypeSlider}
-        onClose={() => setShowGatheringTypeSlider(false)}
+        onClose={handleCloseGatheringTypeSlider}
         initialData={{
           experienceType: typeof gatheringDetail?.gathering?.experience_type === 'string' 
             ? gatheringDetail.gathering.experience_type 
@@ -402,6 +286,7 @@ export default function GatheringSetupScreen() {
           title: gatheringDetail?.gathering?.title || '',
           hosts: gatheringDetail?.gathering?.host || [],
           scribe: gatheringDetail?.gatheringDisplay?.scribe || '',
+          image: gatheringDetail?.gatheringDisplay?.image || '',
         }}
         experienceType={
           typeof gatheringDetail?.gathering?.experience_type === 'string' 
@@ -419,10 +304,28 @@ export default function GatheringSetupScreen() {
           startTime: gatheringDetail?.gathering?.start_time ? new Date(gatheringDetail.gathering.start_time) : undefined,
           endTime: gatheringDetail?.gathering?.end_time ? new Date(gatheringDetail.gathering.end_time) : undefined,
         }}
+        gatheringDetail={gatheringDetail}
+        gyldGatherings={gyldGatherings}
+        mentoring={mentoring}
         onSave={async (data) => {
           await saveGatheringData(async () => {
             console.log('Saving date/time:', data);
-            // TODO: Implement actual save to database
+            
+            // Update gatherings table with start_time and end_time
+            const { error: gatheringError } = await supabase
+              .from('gatherings')
+              .update({
+                start_time: data.startTime.toISOString(),
+                end_time: data.endTime.toISOString()
+              })
+              .eq('id', gatheringId);
+
+            if (gatheringError) {
+              console.error('Error updating gathering date/time:', gatheringError);
+              throw gatheringError;
+            }
+
+            console.log('Date/time saved successfully:', data);
           }, false);
         }}
       />
@@ -431,14 +334,54 @@ export default function GatheringSetupScreen() {
       <LocationSlider
         visible={showLocationSlider}
         onClose={() => setShowLocationSlider(false)}
+        experienceType={gatheringDetail?.gathering?.experience_type?.label}
         initialData={{
           address: gatheringDetail?.gatheringDisplay?.address || '',
-          isRemote: gatheringDetail?.gatheringOther?.remote || false,
+          meeting_link: gatheringDetail?.gatheringDisplay?.meeting_link || '',
+          location_instructions: gatheringDetail?.gatheringDisplay?.location_instructions || '',
+          location_tbd: gatheringDetail?.gatheringOther?.location_tbd || false,
+          remote: gatheringDetail?.gatheringOther?.remote || false,
         }}
         onSave={async (data) => {
           await saveGatheringData(async () => {
-            console.log('Saving location:', data);
-            // TODO: Implement actual save to database
+            console.log('Saving location data:', data);
+            
+            // Update gathering_displays table with address, meeting_link, and location_instructions
+            const displayUpdates: any = {};
+            if (data.address !== undefined) displayUpdates.address = data.address;
+            if (data.meeting_link !== undefined) displayUpdates.meeting_link = data.meeting_link;
+            if (data.location_instructions !== undefined) displayUpdates.location_instructions = data.location_instructions;
+
+            if (Object.keys(displayUpdates).length > 0) {
+              const { error: displayError } = await supabase
+                .from('gathering_displays')
+                .update(displayUpdates)
+                .eq('gathering_id', gatheringId);
+
+              if (displayError) {
+                console.error('Error updating gathering display:', displayError);
+                throw displayError;
+              }
+            }
+
+            // Update gathering_other table with location_tbd and remote
+            const otherUpdates: any = {};
+            if (data.location_tbd !== undefined) otherUpdates.location_tbd = data.location_tbd;
+            if (data.remote !== undefined) otherUpdates.remote = data.remote;
+
+            if (Object.keys(otherUpdates).length > 0) {
+              const { error: otherError } = await supabase
+                .from('gathering_other')
+                .update(otherUpdates)
+                .eq('gathering_id', gatheringId);
+
+              if (otherError) {
+                console.error('Error updating gathering other:', otherError);
+                throw otherError;
+              }
+            }
+
+            console.log('Location data saved successfully:', data);
           }, true);
         }}
       />

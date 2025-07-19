@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Text } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { TextInput, Menu } from 'react-native-paper';
 import { theme } from '../../styles/theme';
 
@@ -32,7 +32,7 @@ export default function PaperDropdown({
   disabled = false,
   error = false,
   mode = 'outlined',
-  backgroundColor = 'rgba(19, 190, 199, 0.08)',
+  backgroundColor = 'white',
   menuBackgroundColor = 'white',
   menuMaxWidth = 300,
   menuMinWidth = 200,
@@ -49,12 +49,21 @@ export default function PaperDropdown({
     setMenuVisible(false);
   };
 
+  // Create custom theme for TextInput label styling
+  const inputTheme = {
+    colors: {
+      // When input has value, label shows on border in brand color with white background
+      primary: displayValue ? theme.colors.primary : theme.colors.border.medium,
+      onSurfaceVariant: displayValue ? theme.colors.primary : theme.colors.text.tertiary,
+      // White background for the label when it has value
+      surface: '#ffffff',
+      surfaceVariant: '#ffffff',
+      background: '#ffffff',
+    },
+  };
+
   return (
     <View style={styles.container}>
-      <Text style={[styles.label, error && styles.labelError]}>
-        {label}
-      </Text>
-      
       <Menu
         visible={menuVisible}
         onDismiss={() => setMenuVisible(false)}
@@ -69,7 +78,8 @@ export default function PaperDropdown({
         anchor={
           <TextInput
             mode={mode}
-            label={placeholder}
+            label={label}
+            placeholder={placeholder}
             value={displayValue}
             right={<TextInput.Icon 
               icon="chevron-down" 
@@ -79,6 +89,7 @@ export default function PaperDropdown({
             editable={false}
             disabled={disabled}
             error={error}
+            theme={inputTheme}
             style={[
               styles.textInput,
               { backgroundColor: disabled ? theme.colors.background.disabled : backgroundColor }
@@ -101,18 +112,10 @@ export default function PaperDropdown({
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: theme.spacing.md,
-  },
-  label: {
-    fontSize: theme.typography.styles.body.fontSize,
-    fontWeight: '600',
-    color: theme.colors.text.primary,
-    marginBottom: theme.spacing.xs,
-  },
-  labelError: {
-    color: theme.colors.status.error,
+    marginBottom: 0,
   },
   textInput: {
+    minHeight: 54,
     // Background color set dynamically via style prop
   },
   menuContent: {

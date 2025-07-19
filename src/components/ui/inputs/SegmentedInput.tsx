@@ -189,7 +189,7 @@ export default function SegmentedInput<T = string>({
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: theme.spacing.md,
+    marginBottom: 0,
   },
   label: {
     fontSize: theme.typography.sizes.md,

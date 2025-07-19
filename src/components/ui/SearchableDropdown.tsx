@@ -4,8 +4,9 @@ import {
   Text,
   useTheme,
 } from 'react-native-paper';
-import { Ionicons } from '@expo/vector-icons';
+import { MaterialIcons } from '@expo/vector-icons';
 import { globalStyles } from '../../styles';
+import { theme } from '../../styles/theme';
 
 interface Option {
   value: any;
@@ -29,9 +30,10 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
   disabled = false,
   label,
 }) => {
-  const theme = useTheme();
+  const paperTheme = useTheme();
   const [modalVisible, setModalVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isFocused, setIsFocused] = useState(false);
   const searchInputRef = useRef<RNTextInput>(null);
 
   // Get selected option for display
@@ -46,12 +48,14 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
 
   const openModal = () => {
     if (!disabled) {
+      setIsFocused(true);
       setSearchQuery('');
       setModalVisible(true);
     }
   };
 
   const closeModal = () => {
+    setIsFocused(false);
     setModalVisible(false);
     setSearchQuery('');
   };
@@ -74,39 +78,82 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
     }
   }, [modalVisible]);
 
+  // Paper-style container component (same as EventDateTimePicker and MultiSelect)
+  const PaperContainer = ({ title, children, style }: { title: string; children: React.ReactNode; style?: any }) => (
+    <View style={[styles.paperContainer, style]}>
+      <View style={styles.paperTitle}>
+        <Text style={[
+          styles.paperTitleText,
+          { color: isFocused ? theme.colors.primary : theme.colors.text.tertiary }
+        ]}>
+          {title}
+        </Text>
+      </View>
+      {children}
+    </View>
+  );
+
+  // Check if we should show the floating label (when there's a selected value)
+  const hasSelectedValue = selectedOption !== undefined;
+  const shouldShowFloatingLabel = label && hasSelectedValue && typeof label === 'string';
+
   return (
     <View style={styles.container}>
-      {/* Label */}
-      {label && (
-        <Text style={styles.label}>{label}</Text>
-      )}
-      
       {/* Main input field */}
-      <TouchableOpacity
-        onPress={openModal}
-        disabled={disabled}
-        style={[
-          globalStyles.input,
-          styles.inputContainer,
-          disabled && styles.disabled,
-        ]}
-      >
-        <View style={styles.contentContainer}>
-          <Text style={[
-            styles.displayText,
-            !selectedOption && styles.placeholderText,
-            { color: selectedOption ? theme.colors.onSurface : theme.colors.onSurfaceVariant }
-          ]}>
-            {selectedOption ? selectedOption.label : placeholder}
-          </Text>
-          <Ionicons 
-            name="chevron-down" 
-            size={20} 
-            color={theme.colors.onSurfaceVariant} 
-            style={styles.chevron}
-          />
-        </View>
-      </TouchableOpacity>
+      {shouldShowFloatingLabel ? (
+        <PaperContainer title={label!}>
+          <TouchableOpacity
+            onPress={openModal}
+            disabled={disabled}
+            style={[
+              styles.paperInputContainer,
+              disabled && styles.disabled,
+            ]}
+          >
+            <View style={styles.contentContainer}>
+              <Text style={[
+                styles.displayText,
+                !selectedOption && styles.placeholderText,
+                { color: selectedOption ? paperTheme.colors.onSurface : theme.colors.text.tertiary }
+              ]}>
+                {selectedOption ? selectedOption.label : placeholder}
+              </Text>
+              <MaterialIcons 
+                name="keyboard-arrow-down" 
+                size={20} 
+                color={theme.colors.text.tertiary} 
+                style={styles.chevron}
+              />
+            </View>
+          </TouchableOpacity>
+        </PaperContainer>
+      ) : (
+        <TouchableOpacity
+          onPress={openModal}
+          disabled={disabled}
+          style={[
+            globalStyles.input,
+            styles.inputContainer,
+            disabled && styles.disabled,
+          ]}
+        >
+          <View style={styles.contentContainer}>
+            <Text style={[
+              styles.displayText,
+              !selectedOption && styles.placeholderText,
+              { color: selectedOption ? paperTheme.colors.onSurface : theme.colors.text.tertiary }
+            ]}>
+              {selectedOption ? selectedOption.label : (label || placeholder)}
+            </Text>
+            <MaterialIcons 
+              name="keyboard-arrow-down" 
+              size={20} 
+              color={theme.colors.text.tertiary} 
+              style={styles.chevron}
+            />
+          </View>
+        </TouchableOpacity>
+      )}
 
       {/* Modal popup */}
       <Modal
@@ -127,22 +174,22 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
           >
             {/* Modal header - simplified, no buttons */}
             <View style={styles.modalHeader}>
-              <TouchableOpacity onPress={closeModal} style={styles.closeButton}>
-                <Ionicons name="close" size={24} color={theme.colors.onSurfaceVariant} />
-              </TouchableOpacity>
+                          <TouchableOpacity onPress={closeModal} style={styles.closeButton}>
+              <MaterialIcons name="close" size={24} color={theme.colors.text.tertiary} />
+            </TouchableOpacity>
               <Text style={styles.modalTitle}>Select Option</Text>
-              <View style={styles.closeButton} /> {/* Spacer for centering */}
+              <View style={styles.closeButton} />
             </View>
 
             {/* Search input - no gray lines */}
             <View style={styles.searchContainer}>
               <RNTextInput
                 ref={searchInputRef}
-                style={[styles.searchInput, { color: theme.colors.onSurface }]}
+                style={[styles.searchInput, { color: paperTheme.colors.onSurface }]}
                 value={searchQuery}
                 onChangeText={handleSearchChange}
                 placeholder="Search options..."
-                placeholderTextColor={theme.colors.onSurfaceVariant}
+                placeholderTextColor={theme.colors.text.tertiary}
                 multiline={false}
               />
             </View>
@@ -154,7 +201,7 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
             >
               {filteredOptions.length === 0 ? (
                 <View style={styles.noResultsContainer}>
-                  <Text style={[styles.noResultsText, { color: theme.colors.onSurfaceVariant }]}>
+                  <Text style={[styles.noResultsText, { color: theme.colors.text.tertiary }]}>
                     No options found
                   </Text>
                 </View>
@@ -170,8 +217,8 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                   >
                     <Text style={[
                       styles.optionText,
-                      { color: theme.colors.onSurface },
-                      value === option.value && { color: theme.colors.primary, fontWeight: 'bold' }
+                      { color: paperTheme.colors.onSurface },
+                      value === option.value && { color: paperTheme.colors.primary, fontWeight: 'bold' }
                     ]}>
                       {option.label}
                     </Text>
@@ -188,7 +235,7 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: 16,
+    marginBottom: 0,
   },
   label: {
     fontSize: 16,
@@ -202,6 +249,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
+    minHeight: 54,
   },
   contentContainer: {
     flex: 1,
@@ -295,6 +343,34 @@ const styles = StyleSheet.create({
   noResultsText: {
     fontSize: 16,
     fontStyle: 'italic',
+  },
+  // Paper-style container (same as EventDateTimePicker and MultiSelect)
+  paperContainer: {
+    position: 'relative',
+    backgroundColor: theme.colors.background.secondary,
+    borderRadius: 8, // Match globalStyles.input borderRadius (layout.borderRadius.sm)
+    borderWidth: 1,
+    borderColor: theme.colors.border.light,
+    // NO padding - let paperInputContainer handle all spacing
+  },
+  paperTitle: {
+    position: 'absolute',
+    top: -10,
+    left: theme.spacing.md,
+    backgroundColor: theme.colors.background.secondary,
+    paddingHorizontal: theme.spacing.xs,
+    zIndex: 1,
+  },
+  paperTitleText: {
+    fontSize: theme.typography.styles.caption.fontSize,
+    fontWeight: '600',
+    // Color is now set dynamically in the component
+  },
+  paperInputContainer: {
+    minHeight: 54,
+    paddingVertical: 0,
+    paddingHorizontal: 14,
+    justifyContent: 'center',
   },
 });
 

@@ -14,7 +14,7 @@ interface MultiSelectProps {
   placeholder?: string;
   disabled?: boolean;
   title?: string;
-  label?: string; // Adding label support for consistency
+  label?: string; // Adding label support for floating label pattern
   error?: boolean;
   required?: boolean;
   style?: any;

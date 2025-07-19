@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, Text, TouchableOpacity, Animated } from 'react-native';
-import { Snackbar, TextInput } from 'react-native-paper';
+import { Snackbar, TextInput, useTheme } from 'react-native-paper';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Feather } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
@@ -26,24 +26,47 @@ export default function EventDateTimePicker({
   error = false,
 }: EventDateTimePickerProps) {
   
+  const paperTheme = useTheme();
+
   // Duration and display state
   const [durationMode, setDurationMode] = useState<'0.5' | '1' | '1.5' | '2' | 'other'>('1.5');
   const [customDuration, setCustomDuration] = useState<string>('');
   const [showToast, setShowToast] = useState(false);
   const [showDurationDropdown, setShowDurationDropdown] = useState(false);
   const [showEndTime, setShowEndTime] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
   
   // Animation for smooth transitions
   const fadeAnim = useState(new Animated.Value(1))[0];
   const endTimeAnim = useState(new Animated.Value(0))[0];
 
-  // Initialize showEndTime based on endTime prop
+  // Initialize showEndTime based on endTime prop and duration
   useEffect(() => {
-    if (endTime && endTime > new Date(startTime.getTime() + 2 * 60 * 60 * 1000)) {
-      setShowEndTime(true);
-      // Set animation values for end time mode
-      fadeAnim.setValue(0);
-      endTimeAnim.setValue(1);
+    if (endTime && startTime) {
+      // Calculate duration in minutes
+      const durationMs = endTime.getTime() - startTime.getTime();
+      const durationMinutes = Math.round(durationMs / (1000 * 60));
+      
+      // Check if duration is NOT one of the standard durations (30, 60, 90, 120 minutes)
+      const standardDurations = [30, 60, 90, 120];
+      const isCustomDuration = !standardDurations.includes(durationMinutes);
+      
+      if (isCustomDuration) {
+        setShowEndTime(true);
+        // Set animation values for end time mode
+        fadeAnim.setValue(0);
+        endTimeAnim.setValue(1);
+      } else {
+        // Reset to duration mode if it was previously in end time mode
+        setShowEndTime(false);
+        fadeAnim.setValue(1);
+        endTimeAnim.setValue(0);
+      }
+    } else {
+      // No endTime provided, stay in duration mode
+      setShowEndTime(false);
+      fadeAnim.setValue(1);
+      endTimeAnim.setValue(0);
     }
   }, [endTime, startTime, fadeAnim, endTimeAnim]);
 
@@ -169,7 +192,12 @@ export default function EventDateTimePicker({
   const PaperContainer = ({ title, children, style }: { title: string; children: React.ReactNode; style?: any }) => (
     <View style={[styles.paperContainer, style]}>
       <View style={styles.paperTitle}>
-        <Text style={styles.paperTitleText}>{title}</Text>
+        <Text style={[
+          styles.paperTitleText,
+          { color: isFocused ? BRAND_COLOR : theme.colors.text.secondary }
+        ]}>
+          {title}
+        </Text>
       </View>
       {children}
     </View>
@@ -199,7 +227,11 @@ export default function EventDateTimePicker({
             <View style={styles.rightSection}>
               <Animated.View style={[styles.durationContainer, { opacity: fadeAnim }]}>
                 <TouchableOpacity
-                  onPress={() => setShowDurationDropdown(!showDurationDropdown)}
+                  onPress={() => {
+                    const newDropdownState = !showDurationDropdown;
+                    setShowDurationDropdown(newDropdownState);
+                    setIsFocused(newDropdownState);
+                  }}
                   style={styles.durationSelector}
                   disabled={disabled}
                 >
@@ -278,7 +310,7 @@ export default function EventDateTimePicker({
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: theme.spacing.md,
+    marginBottom: 0,
   },
   paperContainer: {
     position: 'relative',
@@ -301,7 +333,7 @@ const styles = StyleSheet.create({
   paperTitleText: {
     fontSize: theme.typography.styles.caption.fontSize,
     fontWeight: '600',
-    color: BRAND_COLOR,
+    // Color is now set dynamically in the component
   },
   unifiedContainer: {
     flexDirection: 'row',
@@ -338,9 +370,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.sm,
     backgroundColor: '#ebebeb',
     borderRadius: 6,
-    minHeight: 34,
-    maxHeight: 34,
+    minHeight: 36,
+    maxHeight: 36,
     marginLeft: 8,
+    marginRight: 8,
   },
   durationText: {
     fontSize: 18,
@@ -370,7 +403,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border.light,
-    minHeight: 34,
+    minHeight: 36,
     justifyContent: 'center',
   },
   dropdownItemSelected: {

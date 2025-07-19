@@ -8,11 +8,13 @@ import type {
 /**
  * Creates a new gathering with "unsaved" status for draft editing
  * Sets reasonable defaults and handles optional experience_type
+ * If mentoring=true, automatically sets experience_type to "Mentoring"
  */
 export async function createUnsavedGathering(
   userGyld: string,
   userId: string,
-  experienceType?: string
+  experienceType?: string,
+  mentoring?: boolean
 ): Promise<{ data: any | null; error: any }> {
   try {
     // Get the "unsaved" status ID
@@ -27,6 +29,23 @@ export async function createUnsavedGathering(
       return { data: null, error: statusError };
     }
 
+    // If mentoring mode is requested, look up the Mentoring experience type ID
+    let mentoringExperienceTypeId = null;
+    if (mentoring) {
+      const { data: mentoringData, error: mentoringError } = await supabase
+        .from('experience_type')
+        .select('id')
+        .eq('label', 'Mentoring')
+        .single();
+
+      if (mentoringError) {
+        console.error('Error fetching Mentoring experience type:', mentoringError);
+        return { data: null, error: mentoringError };
+      }
+
+      mentoringExperienceTypeId = mentoringData.id;
+    }
+
     // Prepare gathering data with defaults
     const gatheringData: any = {
       title: null, // User will set this
@@ -37,8 +56,10 @@ export async function createUnsavedGathering(
       end_time: null, // User will set this
     };
 
-    // Add experience_type if provided
-    if (experienceType) {
+    // Add experience_type - prioritize mentoring mode, then provided experienceType
+    if (mentoringExperienceTypeId) {
+      gatheringData.experience_type = mentoringExperienceTypeId;
+    } else if (experienceType) {
       gatheringData.experience_type = experienceType;
     }
 
@@ -54,8 +75,39 @@ export async function createUnsavedGathering(
       return { data: null, error: gatheringError };
     }
 
-    console.log('✅ Created unsaved gathering:', gatheringResult.id);
-    return { data: { gathering_id: gatheringResult.id }, error: null };
+    const gatheringId = gatheringResult.id;
+
+    // Create gathering_displays satellite record
+    const { error: displayError } = await supabase
+      .from('gathering_displays')
+      .insert({
+        gathering_id: gatheringId  // gathering_displays uses 'gathering_id'
+      });
+
+    if (displayError) {
+      console.error('Error creating gathering_displays record:', displayError);
+      // Clean up the gathering record if satellite creation fails
+      await supabase.from('gatherings').delete().eq('id', gatheringId);
+      return { data: null, error: displayError };
+    }
+
+    // Create gathering_other satellite record
+    const { error: otherError } = await supabase
+      .from('gathering_other')
+      .insert({
+        gathering: gatheringId  // gathering_other uses 'gathering' (not 'gathering_id')
+      });
+
+    if (otherError) {
+      console.error('Error creating gathering_other record:', otherError);
+      // Clean up both gathering and gathering_displays if this fails
+      await supabase.from('gathering_displays').delete().eq('gathering_id', gatheringId);
+      await supabase.from('gatherings').delete().eq('id', gatheringId);
+      return { data: null, error: otherError };
+    }
+
+    console.log('✅ Created unsaved gathering with satellites:', gatheringId);
+    return { data: { gathering_id: gatheringId }, error: null };
 
   } catch (error) {
     console.error('Error in createUnsavedGathering:', error);

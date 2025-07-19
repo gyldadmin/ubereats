@@ -172,7 +172,7 @@ export default function MultiLineInput({
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: theme.spacing.md,
+    marginBottom: 0,
   },
   input: {
     backgroundColor: theme.colors.background.secondary,

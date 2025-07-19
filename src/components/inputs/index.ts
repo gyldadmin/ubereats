@@ -3,7 +3,6 @@ export { Input } from './Input';
 export { TextArea } from './TextArea';
 export { DatePicker } from './DatePicker';
 export { TimePicker } from './TimePicker';
-export { Dropdown } from './Dropdown';
 export { MultiSelect } from './MultiSelect';
 export { SegmentedInput } from './SegmentedInput';
 export { ChipSelection } from './ChipSelection';
