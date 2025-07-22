@@ -120,7 +120,8 @@ const styles = StyleSheet.create({
   },
   menuContent: {
     borderRadius: 8,
-    elevation: 8,
+    elevation: 20, // Increased elevation to appear above modals
+    zIndex: 9999, // High z-index for iOS
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,

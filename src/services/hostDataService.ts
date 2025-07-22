@@ -134,7 +134,7 @@ export async function createGatheringSatellites(
     const { data: existingOther } = await supabase
       .from('gathering_other')
       .select('id')
-      .eq('gathering_id', gatheringId)
+      .eq('gathering', gatheringId)  // Use 'gathering' not 'gathering_id'
       .maybeSingle();
 
     const promises = [];
@@ -153,7 +153,7 @@ export async function createGatheringSatellites(
       promises.push(
         supabase
           .from('gathering_other')
-          .insert({ gathering_id: gatheringId })
+          .insert({ gathering: gatheringId })  // Use 'gathering' not 'gathering_id'
       );
     }
 

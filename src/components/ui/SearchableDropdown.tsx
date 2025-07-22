@@ -114,7 +114,7 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
               <Text style={[
                 styles.displayText,
                 !selectedOption && styles.placeholderText,
-                { color: selectedOption ? paperTheme.colors.onSurface : theme.colors.text.tertiary }
+                { color: selectedOption ? paperTheme.colors.onSurface : theme.colors.text.secondary }
               ]}>
                 {selectedOption ? selectedOption.label : placeholder}
               </Text>
@@ -141,7 +141,7 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
             <Text style={[
               styles.displayText,
               !selectedOption && styles.placeholderText,
-              { color: selectedOption ? paperTheme.colors.onSurface : theme.colors.text.tertiary }
+              { color: selectedOption ? paperTheme.colors.onSurface : theme.colors.text.secondary }
             ]}>
               {selectedOption ? selectedOption.label : (label || placeholder)}
             </Text>

@@ -19,11 +19,10 @@ interface SettingsData {
   // Auto-reminders (inverted logic)
   hold_autoreminders: boolean;
   
-  // RSVP question
-  signup_question: string;
+
   
   // Plus guests
-  plus_guests: number;
+  plus_guests: number | null;
   
   // Potluck
   potluck: boolean;
@@ -132,8 +131,8 @@ export const SettingsSlider: React.FC<SettingsSliderProps> = ({
     payment_amount: initialData?.payment_amount || null,
     payment_venmo: initialData?.payment_venmo || null,
     hold_autoreminders: initialData?.hold_autoreminders || false,
-    signup_question: initialData?.signup_question || '',
-    plus_guests: initialData?.plus_guests || 0,
+
+    plus_guests: initialData?.plus_guests || null,
     potluck: initialData?.potluck || false,
   });
   
@@ -141,14 +140,15 @@ export const SettingsSlider: React.FC<SettingsSliderProps> = ({
   const [saving, setSaving] = useState(false);
   const [showPotluckModal, setShowPotluckModal] = useState(false);
 
+
   // Independent toggle states - track section expansion separately from form data
   const [toggleStates, setToggleStates] = useState(() => {
     const initialStates = {
       attendeeCap: (initialData?.cap || 0) > 0,
       paymentToMember: initialData?.payment_to_member || false,
       autoReminders: !(initialData?.hold_autoreminders || false), // Inverted logic
-      rsvpQuestion: (initialData?.signup_question || '').trim() !== '',
-      plusGuests: (initialData?.plus_guests || 0) > 0,
+
+      plusGuests: initialData?.plus_guests != null && initialData.plus_guests > 0,
       potluck: initialData?.potluck || false,
     };
     console.log('🔄 Initial toggle states:', initialStates);
@@ -176,19 +176,17 @@ export const SettingsSlider: React.FC<SettingsSliderProps> = ({
     // Check for boolean toggles that are NOT saved directly (Group B)
     // FIXED: Only detect changes to FALSE, or changes to inputs when toggle is TRUE
     const initialAttendeeCap = (initialData.cap || 0) > 0;
-    const initialRsvpQuestion = (initialData.signup_question || '').trim() !== '';
-    const initialPlusGuests = (initialData.plus_guests || 0) > 0;
+
+    const initialPlusGuests = initialData.plus_guests != null && initialData.plus_guests > 0;
 
     const derivedToggleToFalse = 
       (initialAttendeeCap && !toggleStates.attendeeCap) ||
-      (initialRsvpQuestion && !toggleStates.rsvpQuestion) ||
       (initialPlusGuests && !toggleStates.plusGuests);
 
     // Check for input changes when derived toggles are ON (Group B)
     const derivedInputsChanged = 
       (toggleStates.attendeeCap && formData.cap !== initialData.cap) ||
-      (toggleStates.rsvpQuestion && formData.signup_question !== (initialData.signup_question || '')) ||
-      (toggleStates.plusGuests && formData.plus_guests !== (initialData.plus_guests || 0));
+      (toggleStates.plusGuests && formData.plus_guests !== initialData.plus_guests);
 
     return booleanTogglesChanged || paymentInputsChanged || derivedToggleToFalse || derivedInputsChanged;
   }, [formData, initialData, toggleStates]);
@@ -203,8 +201,8 @@ export const SettingsSlider: React.FC<SettingsSliderProps> = ({
         payment_amount: initialData.payment_amount || null,
         payment_venmo: initialData.payment_venmo || null,
         hold_autoreminders: initialData.hold_autoreminders || false,
-        signup_question: initialData.signup_question || '',
-        plus_guests: initialData.plus_guests || 0,
+
+        plus_guests: initialData.plus_guests || null,
         potluck: initialData.potluck || false,
       });
     }
@@ -225,8 +223,8 @@ export const SettingsSlider: React.FC<SettingsSliderProps> = ({
         payment_amount: formData.payment_to_member ? formData.payment_amount : null,
         payment_venmo: formData.payment_to_member ? formData.payment_venmo : null,
         hold_autoreminders: formData.hold_autoreminders,
-        signup_question: toggleStates.rsvpQuestion ? formData.signup_question : '',
-        plus_guests: toggleStates.plusGuests ? formData.plus_guests : 0,
+
+        plus_guests: toggleStates.plusGuests ? formData.plus_guests : null,
         potluck: formData.potluck,
       };
 
@@ -248,7 +246,6 @@ export const SettingsSlider: React.FC<SettingsSliderProps> = ({
   // Handle toggle changes
   const handleToggleChange = (section: string, value: boolean) => {
     console.log(`🔘 Toggle changed: ${section} = ${value}`);
-    console.log(`📊 Current toggle state for ${section}:`, toggleStates[section as keyof typeof toggleStates]);
     
     // Update toggle states immediately
     setToggleStates(prev => ({
@@ -260,18 +257,16 @@ export const SettingsSlider: React.FC<SettingsSliderProps> = ({
     setFormData(prev => {
       switch (section) {
         case 'attendeeCap':
-          // Set reasonable default when toggling ON
-          return { ...prev, cap: value ? (prev.cap || 10) : null };
+          // No default value when toggling ON
+          return { ...prev, cap: value ? prev.cap : null };
         case 'paymentToMember':
           return { ...prev, payment_to_member: value };
         case 'autoReminders':
           return { ...prev, hold_autoreminders: !value }; // Inverted logic
-        case 'rsvpQuestion':
-          // Clear field when toggling OFF, preserve when toggling ON
-          return { ...prev, signup_question: value ? prev.signup_question : '' };
+
         case 'plusGuests':
-          // Set default guest count when toggling ON
-          return { ...prev, plus_guests: value ? (prev.plus_guests || 1) : 0 };
+          // FALSE → null, TRUE → 3 (hardcoded)
+          return { ...prev, plus_guests: value ? 3 : null };
         case 'potluck':
           if (value && !prev.potluck) {
             // Show potluck modal when toggled ON for first time
@@ -314,16 +309,14 @@ export const SettingsSlider: React.FC<SettingsSliderProps> = ({
     }
   };
 
-  // Plus guests dropdown options
-  const plusGuestsOptions = [
-    { label: '1', value: 1 },
-    { label: '2', value: 2 },
-    { label: '3', value: 3 },
-  ];
 
-  console.log('🎭 About to render Modal, visible:', visible, 'hasUnsavedChanges:', hasUnsavedChanges);
+
+
+
+  console.log('🎭 SettingsSlider rendered, visible:', visible, 'hasUnsavedChanges:', hasUnsavedChanges);
   
   return (
+    <>
     <Modal
       visible={visible}
       animationType="slide"
@@ -396,7 +389,7 @@ export const SettingsSlider: React.FC<SettingsSliderProps> = ({
                 <>
                   <View style={styles.inputContainer}>
                     <SingleLineInput
-                      label="Payment For"
+                      label="Payment for"
                       value={formData.payment_for || ''}
                       onValueChange={(value) => setFormData(prev => ({ ...prev, payment_for: value || null }))}
                       placeholder="What is this payment for?"
@@ -443,35 +436,9 @@ export const SettingsSlider: React.FC<SettingsSliderProps> = ({
               </View>
             </View>
 
-            {/* Section 4: Add Question to RSVP */}
-            <View style={styles.sectionContainer}>
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Add question to RSVP</Text>
-                <Toggle
-                  value={toggleStates.rsvpQuestion}
-                  onValueChange={(value) => {
-                    console.log('👆 RsvpQuestion toggle tapped, current value:', toggleStates.rsvpQuestion, 'new value:', value);
-                    handleToggleChange('rsvpQuestion', value);
-                  }}
-                  style={styles.toggleOverride}
-                />
-              </View>
-              
-              {toggleStates.rsvpQuestion && (
-                <View style={styles.inputContainer}>
-                  <MultiLineInput
-                    label="Question"
-                    value={formData.signup_question}
-                    onValueChange={(value) => setFormData(prev => ({ ...prev, signup_question: value }))}
-                    numberOfLines={2}
-                    placeholder="Enter your RSVP question"
-                    style={styles.inputOverride}
-                  />
-                </View>
-              )}
-            </View>
 
-            {/* Section 5: Guests Can Bring Others */}
+
+            {/* Section 4: Guests Can Bring Others */}
             <View style={styles.sectionContainer}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Guests can bring others</Text>
@@ -484,21 +451,9 @@ export const SettingsSlider: React.FC<SettingsSliderProps> = ({
                   style={styles.toggleOverride}
                 />
               </View>
-              
-              {toggleStates.plusGuests && (
-                <View style={styles.inputContainer}>
-                  <PaperDropdown
-                    label="Plus Guests"
-                    value={formData.plus_guests || 1}
-                    onValueChange={(value) => setFormData(prev => ({ ...prev, plus_guests: value as number }))}
-                    options={plusGuestsOptions}
-                    style={styles.inputOverride}
-                  />
-                </View>
-              )}
             </View>
 
-            {/* Section 6: Potluck Meal */}
+            {/* Section 5: Potluck Meal */}
             <View style={[styles.sectionContainer, styles.lastSection]}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Potluck meal</Text>
@@ -551,6 +506,9 @@ export const SettingsSlider: React.FC<SettingsSliderProps> = ({
 
       </View>
     </Modal>
+
+
+    </>
   );
 };
 
@@ -598,13 +556,11 @@ const styles = StyleSheet.create({
   sectionContainer: {
     paddingVertical: 20, // Exactly 20px top and bottom
     paddingHorizontal: theme.spacing.lg, // Standard horizontal padding
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border.light,
     // Ensure stable positioning during expansion
     position: 'relative',
   },
   lastSection: {
-    borderBottomWidth: 0, // No bottom border on last section
+    // Keep for potential future use
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -673,7 +629,8 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     flexDirection: 'row',
-    padding: theme.spacing.lg + 20,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.lg + 20,
     gap: theme.spacing.md,
     borderTopWidth: 1,
     borderTopColor: theme.colors.border.light,
@@ -769,5 +726,47 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.sizes.md,
     fontWeight: theme.typography.weights.semibold,
     color: theme.colors.text.inverse,
+  },
+
+
+
+  // RSVP Question Modal Styles
+  rsvpModalContainer: {
+    flex: 1,
+    backgroundColor: theme.colors.background.secondary,
+    zIndex: 9999,
+    elevation: 20,
+  },
+  rsvpModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border.light,
+  },
+  rsvpModalTitle: {
+    fontSize: theme.typography.sizes.lg,
+    fontWeight: theme.typography.weights.bold,
+    color: theme.colors.text.primary,
+  },
+  rsvpModalCancelText: {
+    fontSize: theme.typography.sizes.md,
+    fontWeight: theme.typography.weights.medium,
+    color: theme.colors.text.secondary,
+  },
+  rsvpModalSaveText: {
+    fontSize: theme.typography.sizes.md,
+    fontWeight: theme.typography.weights.semibold,
+    color: theme.colors.primary,
+  },
+  rsvpModalSaveTextDisabled: {
+    color: theme.colors.text.tertiary,
+  },
+  rsvpModalContent: {
+    flex: 1,
+    padding: theme.spacing.lg,
+    paddingTop: theme.spacing.xl,
   },
 }); 

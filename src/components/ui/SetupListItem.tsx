@@ -50,7 +50,13 @@ export default function SetupListItem({
             <Feather 
               name={isFullyComplete ? "check-circle" : "circle"} 
               size={20} 
-              color={isComplete ? theme.colors.primary : theme.colors.text.secondary} 
+              color={
+                isTBD 
+                  ? '#10B981' // Green color for COMPLETE_TBD state
+                  : isComplete 
+                    ? theme.colors.primary // Aqua color for COMPLETE state
+                    : theme.colors.text.secondary // Grey color for INCOMPLETE state
+              } 
             />
           </View>
           

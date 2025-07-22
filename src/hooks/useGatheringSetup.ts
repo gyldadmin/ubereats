@@ -15,6 +15,29 @@ import { GatheringDetailData } from './useGatheringDetail';
  */
 export const useGatheringSetup = (gatheringId?: string, gatheringDetail?: GatheringDetailData) => {
   
+  // Calculate gathering type status based on experience_type data
+  const calculateGatheringTypeStatus = (): SetupItemStatus => {
+    // Check if experience_type exists and is not empty
+    if (gatheringDetail?.gathering?.experience_type) {
+      return SetupItemStatus.COMPLETE;
+    } else {
+      return SetupItemStatus.INCOMPLETE;
+    }
+  };
+
+  // Calculate title and hosts status based on title and host data
+  const calculateTitleAndHostsStatus = (): SetupItemStatus => {
+    const title = gatheringDetail?.gathering?.title;
+    const hosts = gatheringDetail?.gathering?.host;
+    
+    // Check if title exists and is not empty, and hosts array has at least one item
+    if (title && title.trim() !== '' && hosts && hosts.length > 0 && hosts[0]) {
+      return SetupItemStatus.COMPLETE;
+    } else {
+      return SetupItemStatus.INCOMPLETE;
+    }
+  };
+
   // Calculate dateTime status based on gathering data
   const calculateDateTimeStatus = (): SetupItemStatus => {
     if (!gatheringDetail?.gathering?.start_time) {
@@ -54,14 +77,19 @@ export const useGatheringSetup = (gatheringId?: string, gatheringDetail?: Gather
 
   // Calculate mentor status based on experience type and mentor data
   const calculateMentorStatus = (): SetupItemStatus => {
+    // Return INCOMPLETE during loading to prevent flickering
+    if (!gatheringDetail) {
+      return SetupItemStatus.INCOMPLETE;
+    }
+    
     // Only calculate mentor status for Mentoring experience types
-    if (gatheringDetail?.gathering?.experience_type?.label !== 'Mentoring') {
+    if (gatheringDetail.gathering?.experience_type?.label !== 'Mentoring') {
       // For non-mentoring gatherings, mentor is not applicable (considered complete)
       return SetupItemStatus.COMPLETE;
     }
 
     // For Mentoring gatherings, check if mentor array exists and is not empty
-    const mentors = gatheringDetail?.gatheringDisplay?.mentor;
+    const mentors = gatheringDetail.gatheringDisplay?.mentor;
     if (mentors && mentors.length > 0) {
       return SetupItemStatus.COMPLETE;
     } else {
@@ -81,14 +109,24 @@ export const useGatheringSetup = (gatheringId?: string, gatheringDetail?: Gather
   };
 
   const [setupState, setSetupState] = useState<GatheringSetupState>({
-    gatheringType: { status: SetupItemStatus.COMPLETE }, // Example: already completed
-    titleAndHosts: { status: SetupItemStatus.COMPLETE }, // Example: already completed
+    gatheringType: { status: calculateGatheringTypeStatus() }, // Dynamic calculation
+    titleAndHosts: { status: calculateTitleAndHostsStatus() }, // Dynamic calculation
     dateTime: { status: calculateDateTimeStatus() }, // Dynamic calculation
     location: { status: calculateLocationStatus() }, // Dynamic calculation
     mentor: { status: calculateMentorStatus() }, // Dynamic calculation
     description: { status: calculateDescriptionStatus() }, // Dynamic calculation
   });
   
+  // Update gathering type status whenever gatheringDetail changes
+  const currentGatheringTypeStatus = useMemo(() => {
+    return calculateGatheringTypeStatus();
+  }, [gatheringDetail?.gathering?.experience_type]);
+
+  // Update title and hosts status whenever relevant gathering data changes
+  const currentTitleAndHostsStatus = useMemo(() => {
+    return calculateTitleAndHostsStatus();
+  }, [gatheringDetail?.gathering?.title, gatheringDetail?.gathering?.host]);
+
   // Update dateTime status whenever gatheringDetail changes
   const currentDateTimeStatus = useMemo(() => {
     return calculateDateTimeStatus();
@@ -117,6 +155,22 @@ export const useGatheringSetup = (gatheringId?: string, gatheringDetail?: Gather
     return calculateDescriptionStatus();
   }, [gatheringDetail?.gatheringDisplay?.description]);
   
+  // Update setupState when gathering type status changes
+  useMemo(() => {
+    setSetupState(prev => ({
+      ...prev,
+      gatheringType: { status: currentGatheringTypeStatus }
+    }));
+  }, [currentGatheringTypeStatus]);
+
+  // Update setupState when title and hosts status changes
+  useMemo(() => {
+    setSetupState(prev => ({
+      ...prev,
+      titleAndHosts: { status: currentTitleAndHostsStatus }
+    }));
+  }, [currentTitleAndHostsStatus]);
+
   // Update setupState when dateTime status changes
   useMemo(() => {
     setSetupState(prev => ({

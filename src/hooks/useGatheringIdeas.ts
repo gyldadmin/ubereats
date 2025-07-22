@@ -47,7 +47,7 @@ export const useGatheringIdeas = (experienceTypeId?: string) => {
         throw ideasError;
       }
 
-      console.log(' Gathering ideas result:', ideasData?.length || 0, 'ideas found');
+      console.log('✅ Gathering ideas result:', ideasData?.length || 0, 'ideas found');
       setGatheringIdeas(ideasData || []);
 
     } catch (err) {

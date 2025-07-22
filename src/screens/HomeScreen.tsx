@@ -20,6 +20,7 @@ import {
   EventDateTimePicker 
 } from '../components/inputs';
 import { ImageUpload } from '../components/ui';
+import { supabase } from '../services/supabase';
 
 // Constants for expandable list behavior
 const INITIAL_VISIBLE_COUNT = 3;
@@ -68,6 +69,40 @@ export default function HomeScreen() {
       (navigation as any).navigate('EventDetail', { 
         gatheringData: gatheringData 
       });
+    }
+  };
+
+  // Function to load the most recent gathering for testing
+  const handleSetupWithRecentGathering = async () => {
+    try {
+      console.log('🔍 Fetching most recent gathering...');
+      
+      // Query the most recent gathering
+      const { data: recentGathering, error } = await supabase
+        .from('gatherings')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (error) {
+        console.error('❌ Error fetching recent gathering:', error);
+        return;
+      }
+
+      if (!recentGathering) {
+        console.log('⚠️ No gatherings found');
+        return;
+      }
+
+      console.log('✅ Found recent gathering:', recentGathering.id);
+      
+      // Navigate to GatheringSetup with the gathering data
+      (navigation as any).navigate('GatheringSetup', { 
+        gatheringId: recentGathering.id // Pass the gathering ID to load existing gathering
+      });
+    } catch (error) {
+      console.error('❌ Error in handleSetupWithRecentGathering:', error);
     }
   };
 
@@ -218,6 +253,18 @@ export default function HomeScreen() {
               onPress={() => (navigation as any).navigate('GatheringSetup', { mentoring: true })}
             >
               <Text style={styles.tempButtonText}>Setup</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.tempButton}
+              onPress={() => (navigation as any).navigate('GatheringSetup', { mentoring: false })}
+            >
+              <Text style={styles.tempButtonText}>Setup (Other)</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.tempButton}
+              onPress={handleSetupWithRecentGathering}
+            >
+              <Text style={styles.tempButtonText}>Setup (Recent)</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.tempButton}
@@ -396,7 +443,7 @@ const InputTestingSection = () => {
       <ChipSelection
         label="Chip Selection"
         value={chipSelectionValue}
-        onValueChange={setChipSelectionValue}
+        onValueChange={(value) => setChipSelectionValue(Array.isArray(value) ? value : [value])}
         options={chipOptions}
         multiSelect={true}
       />

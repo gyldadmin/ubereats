@@ -37,6 +37,7 @@ export const DescriptionSlider: React.FC<DescriptionSliderProps> = ({
   const [saving, setSaving] = useState(false);
   const [showGatheringIdeasPopup, setShowGatheringIdeasPopup] = useState(false);
   const [showSimpleHelpNote, setShowSimpleHelpNote] = useState(false);
+  const [simpleModalMessage, setSimpleModalMessage] = useState('');
   const [popupView, setPopupView] = useState<'intro' | 'list' | 'detail'>('intro');
   const [selectedIdea, setSelectedIdea] = useState<any>(null);
   const [hasInteractedWithPopup, setHasInteractedWithPopup] = useState(false);
@@ -109,6 +110,7 @@ export const DescriptionSlider: React.FC<DescriptionSliderProps> = ({
   const handleGatheringIdeasLinkPress = () => {
     if (!hasIdeas) {
       // If no ideas, show simple help note modal
+      setSimpleModalMessage('Help your guests get closer to each other');
       setShowSimpleHelpNote(true);
       return;
     }
@@ -126,13 +128,7 @@ export const DescriptionSlider: React.FC<DescriptionSliderProps> = ({
   };
 
   const handleAddIdeaToDescription = async (idea: any) => {
-    if (!idea.description_text) return;
-
-    // Add idea text to description
-    const newDescription = description + (description ? '\n\n' : '') + idea.description_text;
-    setDescription(newDescription);
-
-    // Save gathering_idea reference to gathering_other table
+    // a) Add gathering_idea to gatheringDetail.gatheringOther.gathering_idea
     if (gatheringId) {
       try {
         const { error } = await supabase
@@ -150,9 +146,22 @@ export const DescriptionSlider: React.FC<DescriptionSliderProps> = ({
       }
     }
 
-    // Hide popup
+    // b) Hide popup
     setShowGatheringIdeasPopup(false);
     setShowAddInfo(false);
+
+    // c) If description_text is not empty, show simple popup and append text
+    if (idea.description_text && idea.description_text.trim()) {
+      // Show simple popup with custom message
+      setSimpleModalMessage(`We'll add ${idea.label} to your gathering description.`);
+      setShowSimpleHelpNote(true);
+      
+      // Append description_text to the end of description input
+      const currentDesc = description.trim();
+      const needsCarriageReturn = currentDesc && !currentDesc.endsWith('\n');
+      const newDescription = currentDesc + (needsCarriageReturn ? '\n\n' : (currentDesc ? '\n\n' : '')) + idea.description_text;
+      setDescription(newDescription);
+    }
   };
 
   // Get popup buttons based on current view
@@ -174,13 +183,9 @@ export const DescriptionSlider: React.FC<DescriptionSliderProps> = ({
             style: 'secondary'
           },
           {
-            text: 'Add',
+            text: selectedIdea?.description_text && selectedIdea.description_text.trim() ? 'Add' : 'Done',
             onPress: () => {
-              if (showAddInfo) {
-                handleAddIdeaToDescription(selectedIdea);
-              } else {
-                setShowAddInfo(true);
-              }
+              handleAddIdeaToDescription(selectedIdea);
             },
             style: 'primary'
           }
@@ -205,9 +210,6 @@ export const DescriptionSlider: React.FC<DescriptionSliderProps> = ({
       case 'list':
         return (
           <View style={styles.popupListContent}>
-            <Text style={styles.popupListTitle}>
-              {experienceTypeLabel} Idea{gatheringIdeas.length === 1 ? '' : 's'}
-            </Text>
             <ScrollView style={styles.ideaList}>
               {gatheringIdeas.map((idea) => (
                 <TouchableOpacity
@@ -217,10 +219,10 @@ export const DescriptionSlider: React.FC<DescriptionSliderProps> = ({
                     setSelectedIdea(idea);
                     setPopupView('detail');
                   }}
+                  activeOpacity={0.7}
                 >
                   <Text style={styles.ideaLabel}>{idea.label}</Text>
-                  <Text style={styles.ideaTag}>{idea.tag}</Text>
-                  <Text style={styles.ideaExploreLink}>explore</Text>
+                  <FontAwesome5 name="chevron-right" size={16} color="#666" style={styles.chevronIcon} />
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -231,9 +233,7 @@ export const DescriptionSlider: React.FC<DescriptionSliderProps> = ({
         return (
           <View style={styles.popupDetailContent}>
             <ScrollView>
-              <Text style={styles.popupDetailTitle}>{selectedIdea?.label}</Text>
-              
-              <View style={styles.detailSection}>
+              <View style={styles.detailSectionWithMargin}>
                 <Text style={styles.detailSectionTitle}>About</Text>
                 <Text style={styles.detailSectionContent}>{selectedIdea?.overview}</Text>
               </View>
@@ -242,14 +242,6 @@ export const DescriptionSlider: React.FC<DescriptionSliderProps> = ({
                 <Text style={styles.detailSectionTitle}>Why It Works</Text>
                 <Text style={styles.detailSectionContent}>{selectedIdea?.why}</Text>
               </View>
-              
-              {showAddInfo && (
-                <View style={styles.addInfo}>
-                  <Text style={styles.addInfoText}>
-                    We'll add {selectedIdea?.label?.toLowerCase()} to your gathering description
-                  </Text>
-                </View>
-              )}
             </ScrollView>
           </View>
         );
@@ -323,7 +315,9 @@ export const DescriptionSlider: React.FC<DescriptionSliderProps> = ({
                 </Animated.View>
               </View>
               
-              <Text style={styles.magicLinkText}>The secret to hosting</Text>
+              <Text style={styles.magicLinkText}>
+              {hasInteractedWithPopup ? 'Ideas and Themes' : 'The secret to hosting'}
+            </Text>
             </TouchableOpacity>
 
             {/* Extra padding at bottom for floating buttons */}
@@ -375,7 +369,7 @@ export const DescriptionSlider: React.FC<DescriptionSliderProps> = ({
               onPress={() => {}} // Prevent close when tapping content
             >
               <Text style={styles.simpleModalText}>
-                Help your guests get closer to each other
+                {simpleModalMessage}
               </Text>
             </TouchableOpacity>
           </TouchableOpacity>
@@ -389,11 +383,11 @@ export const DescriptionSlider: React.FC<DescriptionSliderProps> = ({
               setShowGatheringIdeasPopup(false);
               setShowAddInfo(false);
             }}
-            title={popupView === 'intro' ? 'Gathering Ideas' : 
+            title={popupView === 'intro' ? '' : 
                   popupView === 'list' ? `${experienceTypeLabel} Ideas` :
                   selectedIdea?.label || 'Idea Detail'}
             buttons={getPopupButtons()}
-            height={popupView === 'detail' ? 400 : 280}
+            height={360}
           >
             {renderPopupContent()}
           </StandardPopup>
@@ -477,11 +471,11 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.md,
   },
   popupIntroText: {
-    fontSize: theme.typography.sizes.lg,
+    fontSize: theme.typography.sizes.xl, // Increased from lg to xl
     fontWeight: theme.typography.weights.medium,
     color: theme.colors.text.primary,
     textAlign: 'center',
-    lineHeight: 24,
+    lineHeight: 28, // Adjusted line height for larger text
   },
 
   // List view styles
@@ -497,32 +491,36 @@ const styles = StyleSheet.create({
   },
   ideaList: {
     flex: 1,
+    paddingTop: 8, // Small padding at top
+    paddingBottom: 16, // Extra padding at bottom
   },
   ideaListItem: {
-    backgroundColor: theme.colors.background.tertiary,
-    borderRadius: theme.spacing.sm,
-    padding: theme.spacing.md,
-    marginBottom: theme.spacing.sm,
+    backgroundColor: theme.colors.background.primary,
+    borderRadius: 12, // More rounded for modern look
+    paddingVertical: 18, // More generous vertical padding
+    paddingHorizontal: 20, // More generous horizontal padding
+    marginBottom: 12, // Consistent spacing
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 3, // For Android shadow
     borderWidth: 1,
-    borderColor: theme.colors.border.light,
+    borderColor: 'rgba(0, 0, 0, 0.04)', // Very subtle border
   },
   ideaLabel: {
-    fontSize: theme.typography.sizes.md,
+    fontSize: theme.typography.sizes.lg, // Larger, more prominent
     fontWeight: theme.typography.weights.semibold,
     color: theme.colors.text.primary,
-    marginBottom: theme.spacing.xs,
+    flex: 1, // Take up available space
+    lineHeight: 22,
   },
-  ideaTag: {
-    fontSize: theme.typography.sizes.sm,
-    color: theme.colors.text.secondary,
-    marginBottom: theme.spacing.sm,
-    fontStyle: 'italic',
-  },
-  ideaExploreLink: {
-    fontSize: theme.typography.sizes.sm,
-    color: theme.colors.primary,
-    fontWeight: theme.typography.weights.medium,
-    textAlign: 'right',
+  chevronIcon: {
+    opacity: 0.6,
+    marginLeft: 12,
   },
 
   // Detail view styles
@@ -537,7 +535,10 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.lg,
   },
   detailSection: {
-    marginBottom: theme.spacing.lg,
+    // No bottom margin - spacing handled individually
+  },
+  detailSectionWithMargin: {
+    marginBottom: theme.spacing.lg, // Only for sections that need spacing after
   },
   detailSectionTitle: {
     fontSize: theme.typography.sizes.md,
@@ -577,7 +578,8 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     flexDirection: 'row',
-    padding: theme.spacing.lg + 20,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.lg + 20,
     gap: theme.spacing.md,
     borderTopWidth: 1,
     borderTopColor: theme.colors.border.light,

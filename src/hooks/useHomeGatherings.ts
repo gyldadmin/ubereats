@@ -234,7 +234,7 @@ export const useHomeGatherings = () => {
         .select(`
           *,
           gathering_status!inner(label),
-          experience_type(label, image_square),
+          experience_type(id, label, image_square),
           gathering_displays!inner(*),
           gathering_other!inner(*)
         `)

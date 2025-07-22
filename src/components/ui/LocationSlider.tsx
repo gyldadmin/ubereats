@@ -39,6 +39,7 @@ export const LocationSlider: React.FC<LocationSliderProps> = ({
   const [saving, setSaving] = useState(false);
   const [meetingLinkError, setMeetingLinkError] = useState<string>('');
   const [remoteLinkPressed, setRemoteLinkPressed] = useState(false);
+  const [showSaveChangesPopup, setShowSaveChangesPopup] = useState(false);
 
   // Initialize form when modal opens
   useEffect(() => {
@@ -121,6 +122,26 @@ export const LocationSlider: React.FC<LocationSliderProps> = ({
     }
   };
 
+  // Handle close with unsaved changes check
+  const handleClose = () => {
+    if (hasUnsavedChanges()) {
+      setShowSaveChangesPopup(true);
+    } else {
+      onClose();
+    }
+  };
+
+  // Handle save changes popup responses
+  const handleSaveChanges = async () => {
+    await handleSave();
+    setShowSaveChangesPopup(false);
+  };
+
+  const handleDiscardChanges = () => {
+    setShowSaveChangesPopup(false);
+    onClose();
+  };
+
   // Check if remote link should be visible based on experience type
   const shouldShowRemoteLink = (): boolean => {
     if (!experienceType) return false;
@@ -129,11 +150,12 @@ export const LocationSlider: React.FC<LocationSliderProps> = ({
   };
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={onClose}
+    <>
+      <Modal
+        visible={visible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={handleClose}
     >
       <View style={styles.modalContainer}>
         {/* Header - matching TitleAndHostsSlider exactly */}
@@ -265,7 +287,7 @@ export const LocationSlider: React.FC<LocationSliderProps> = ({
         <View style={styles.modalButtons}>
           <TouchableOpacity 
             style={styles.cancelButton}
-            onPress={onClose}
+            onPress={handleClose}
           >
             <Text style={styles.cancelButtonText}>Cancel</Text>
           </TouchableOpacity>
@@ -288,6 +310,44 @@ export const LocationSlider: React.FC<LocationSliderProps> = ({
         </View>
       </View>
     </Modal>
+
+    {/* Save Changes Popup */}
+    <Modal
+      visible={showSaveChangesPopup}
+      transparent={true}
+      animationType="fade"
+      onRequestClose={() => setShowSaveChangesPopup(false)}
+    >
+      <TouchableOpacity 
+        style={styles.popupOverlay} 
+        activeOpacity={1} 
+        onPress={() => setShowSaveChangesPopup(false)}
+      >
+        <View style={styles.popupContainer}>
+          <Text style={styles.popupTitle}>Save Changes to Location?</Text>
+          <Text style={styles.popupMessage}>
+            You have unsaved changes that will be lost if you continue.
+          </Text>
+          
+          <View style={styles.popupButtons}>
+            <TouchableOpacity 
+              style={styles.popupNoButton}
+              onPress={handleDiscardChanges}
+            >
+              <Text style={styles.popupNoButtonText}>No</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.popupYesButton}
+              onPress={handleSaveChanges}
+            >
+              <Text style={styles.popupYesButtonText}>Yes</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </TouchableOpacity>
+    </Modal>
+  </>
   );
 };
 
@@ -377,7 +437,8 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     flexDirection: 'row',
-    padding: theme.spacing.lg + 20,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.lg + 20,
     gap: theme.spacing.md,
     borderTopWidth: 1,
     borderTopColor: theme.colors.border.light,
@@ -415,6 +476,66 @@ const styles = StyleSheet.create({
   },
   saveButtonTextInactive: {
     color: theme.colors.text.secondary,
+  },
+
+  // Save Changes Popup Styles
+  popupOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  popupContainer: {
+    backgroundColor: theme.colors.background.secondary,
+    borderRadius: 12,
+    padding: theme.spacing.lg,
+    margin: theme.spacing.lg,
+    width: 320,
+    elevation: 8,
+    justifyContent: 'space-between',
+  },
+  popupTitle: {
+    fontSize: theme.typography.sizes.lg,
+    fontWeight: theme.typography.weights.semibold,
+    color: theme.colors.text.primary,
+    textAlign: 'center',
+    marginBottom: theme.spacing.md,
+    lineHeight: 24,
+  },
+  popupMessage: {
+    fontSize: theme.typography.sizes.md,
+    color: theme.colors.text.secondary,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: theme.spacing.lg,
+  },
+  popupButtons: {
+    flexDirection: 'row',
+    gap: theme.spacing.md,
+  },
+  popupNoButton: {
+    flex: 1,
+    backgroundColor: theme.colors.background.tertiary,
+    borderRadius: 8,
+    paddingVertical: theme.spacing.md,
+    alignItems: 'center',
+  },
+  popupNoButtonText: {
+    fontSize: theme.typography.sizes.md,
+    fontWeight: theme.typography.weights.medium,
+    color: theme.colors.text.secondary,
+  },
+  popupYesButton: {
+    flex: 1,
+    backgroundColor: theme.colors.primary,
+    borderRadius: 8,
+    paddingVertical: theme.spacing.md,
+    alignItems: 'center',
+  },
+  popupYesButtonText: {
+    fontSize: theme.typography.sizes.md,
+    fontWeight: theme.typography.weights.semibold,
+    color: theme.colors.text.inverse,
   },
 });
 

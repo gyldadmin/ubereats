@@ -13,13 +13,14 @@ import type { GatheringCardData } from '../../../hooks/useHomeGatherings';
 
 interface EventDetailScreenRouteParams {
   gatheringData: GatheringCardData;
+  previewMode?: boolean; // Optional flag to disable RSVP in preview mode
 }
 
 
 
 export default function EventDetailScreen() {
   const route = useRoute();
-  const { gatheringData } = route.params as EventDetailScreenRouteParams;
+  const { gatheringData, previewMode = false } = route.params as EventDetailScreenRouteParams;
   const insets = useSafeAreaInsets();
   
   // Use the comprehensive gathering detail hook
@@ -821,48 +822,57 @@ export default function EventDetailScreen() {
 
       {/* Action Buttons */}
       <View style={[styles.actionButtons, { paddingBottom: spacing.lg + insets.bottom }]}>
-        {/* State 1: No RSVP (pending) - Show Yes/No buttons */}
-        {rsvpStatus === 'pending' && (
-          <View style={styles.rsvpContainer}>
-            <Text style={styles.rsvpLabel}>RSVP:</Text>
-            <View style={styles.buttonRow}>
+        {previewMode ? (
+          /* Preview Mode - Show non-interactive message */
+          <View style={styles.previewModeContainer}>
+            <Text style={styles.previewModeText}>Preview Mode - RSVP not available</Text>
+          </View>
+        ) : (
+          <>
+            {/* State 1: No RSVP (pending) - Show Yes/No buttons */}
+            {rsvpStatus === 'pending' && (
+              <View style={styles.rsvpContainer}>
+                <Text style={styles.rsvpLabel}>RSVP:</Text>
+                <View style={styles.buttonRow}>
+                  <TouchableOpacity 
+                    style={styles.rsvpNoButton}
+                    onPress={() => updateRSVP('no')}
+                  >
+                    <Text style={styles.rsvpNoButtonText}>Regrets</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={styles.rsvpYesButton}
+                    onPress={() => {
+                      updateRSVP('yes');
+                      setShowRSVPConfirmation(true);
+                    }}
+                  >
+                    <Text style={styles.rsvpYesButtonText}>Attend</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
+            {/* State 2: RSVP Yes - Show green "RSVP: Yes" button */}
+            {rsvpStatus === 'yes' && (
               <TouchableOpacity 
-                style={styles.rsvpNoButton}
+                style={styles.rsvpConfirmedYesButton}
                 onPress={() => updateRSVP('no')}
               >
-                <Text style={styles.rsvpNoButtonText}>Regrets</Text>
+                <Text style={styles.rsvpConfirmedYesButtonText}>RSVP: Yes</Text>
               </TouchableOpacity>
+            )}
+
+            {/* State 3: RSVP No - Show maroon "RSVP: No" button */}
+            {rsvpStatus === 'no' && (
               <TouchableOpacity 
-                style={styles.rsvpYesButton}
-                onPress={() => {
-                  updateRSVP('yes');
-                  setShowRSVPConfirmation(true);
-                }}
+                style={styles.rsvpConfirmedNoButton}
+                onPress={() => updateRSVP('yes')}
               >
-                <Text style={styles.rsvpYesButtonText}>Attend</Text>
+                <Text style={styles.rsvpConfirmedNoButtonText}>RSVP: No</Text>
               </TouchableOpacity>
-            </View>
-          </View>
-        )}
-
-        {/* State 2: RSVP Yes - Show green "RSVP: Yes" button */}
-        {rsvpStatus === 'yes' && (
-          <TouchableOpacity 
-            style={styles.rsvpConfirmedYesButton}
-            onPress={() => updateRSVP('no')}
-          >
-            <Text style={styles.rsvpConfirmedYesButtonText}>RSVP: Yes</Text>
-          </TouchableOpacity>
-        )}
-
-        {/* State 3: RSVP No - Show maroon "RSVP: No" button */}
-        {rsvpStatus === 'no' && (
-          <TouchableOpacity 
-            style={styles.rsvpConfirmedNoButton}
-            onPress={() => updateRSVP('yes')}
-          >
-            <Text style={styles.rsvpConfirmedNoButtonText}>RSVP: No</Text>
-          </TouchableOpacity>
+            )}
+          </>
         )}
       </View>
       
@@ -1915,5 +1925,18 @@ const styles = StyleSheet.create({
     fontWeight: typography.weights.semibold,
     color: colors.status.success,
     marginTop: spacing.md,
+  },
+  previewModeContainer: {
+    backgroundColor: colors.background.tertiary,
+    borderRadius: spacing.md,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  previewModeText: {
+    fontSize: typography.sizes.md,
+    color: colors.text.secondary,
+    fontStyle: 'italic',
   },
 }); 
