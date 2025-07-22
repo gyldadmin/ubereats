@@ -71,7 +71,7 @@ export const CustomCheckbox = ({
           width: 20,
           height: 20,
           borderWidth: 1,
-          borderColor: error ? theme.colors.error : borderColor,
+          borderColor: error ? theme.colors.status.error : borderColor,
           borderRadius: 2,
           backgroundColor: backgroundColor,
           justifyContent: 'center',
@@ -97,8 +97,8 @@ export const CustomCheckbox = ({
               {
                 fontSize: theme.typography.sizes.md,
                 fontWeight: theme.typography.weights.medium,
-                color: error ? theme.colors.error : 
-                       disabled ? theme.colors.text.disabled : 
+                color: error ? theme.colors.status.error : 
+                       disabled ? theme.colors.text.tertiary : 
                        theme.colors.text.primary,
                 flex: 1,
               },
@@ -106,7 +106,7 @@ export const CustomCheckbox = ({
             ]}
           >
             {label}
-            {required && <Text style={{ color: theme.colors.error }}> *</Text>}
+            {required && <Text style={{ color: theme.colors.status.error }}> *</Text>}
           </Text>
         )}
       </TouchableOpacity>

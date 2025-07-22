@@ -69,24 +69,13 @@ export const useGatheringSetup = (gatheringId?: string, gatheringDetail?: Gather
     }
   };
 
-  // Calculate description status based on description data
-  const calculateDescriptionStatus = (): SetupItemStatus => {
-    // Check if description exists and is not empty
-    const description = gatheringDetail?.gatheringDisplay?.description;
-    if (description && description.trim() !== '') {
-      return SetupItemStatus.COMPLETE;
-    } else {
-      return SetupItemStatus.INCOMPLETE;
-    }
-  };
-
   const [setupState, setSetupState] = useState<GatheringSetupState>({
     gatheringType: { status: SetupItemStatus.COMPLETE }, // Example: already completed
     titleAndHosts: { status: SetupItemStatus.COMPLETE }, // Example: already completed
     dateTime: { status: calculateDateTimeStatus() }, // Dynamic calculation
     location: { status: calculateLocationStatus() }, // Dynamic calculation
     mentor: { status: calculateMentorStatus() }, // Dynamic calculation
-    description: { status: calculateDescriptionStatus() }, // Dynamic calculation
+    description: { status: SetupItemStatus.INCOMPLETE },
   });
   
   // Update dateTime status whenever gatheringDetail changes
@@ -112,11 +101,6 @@ export const useGatheringSetup = (gatheringId?: string, gatheringDetail?: Gather
     gatheringDetail?.gatheringDisplay?.mentor
   ]);
   
-  // Update description status whenever relevant gathering data changes
-  const currentDescriptionStatus = useMemo(() => {
-    return calculateDescriptionStatus();
-  }, [gatheringDetail?.gatheringDisplay?.description]);
-  
   // Update setupState when dateTime status changes
   useMemo(() => {
     setSetupState(prev => ({
@@ -140,14 +124,6 @@ export const useGatheringSetup = (gatheringId?: string, gatheringDetail?: Gather
       mentor: { status: currentMentorStatus }
     }));
   }, [currentMentorStatus]);
-
-  // Update setupState when description status changes
-  useMemo(() => {
-    setSetupState(prev => ({
-      ...prev,
-      description: { status: currentDescriptionStatus }
-    }));
-  }, [currentDescriptionStatus]);
   
   // Update individual setup item status and data
   const updateSetupItem = (

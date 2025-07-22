@@ -1,111 +1,647 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet } from 'react-native';
-import { Text } from 'react-native-paper';
-import StandardSlider from './StandardSlider';
-import { TextArea } from '../../components/inputs/TextArea';
+﻿import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal, Animated } from 'react-native';
+import { Ionicons, MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
+import { MultiLineInput } from './inputs';
+import { StandardPopup, PopupButton } from './StandardPopup';
+import { useGatheringIdeas } from '../../hooks';
+import { supabase } from '../../services/supabase';
+
+interface DescriptionData {
+  description: string;
+}
 
 interface DescriptionSliderProps {
   visible: boolean;
   onClose: () => void;
-  onSave: (data: {
-    description: string;
-  }) => Promise<void>;
-  initialData?: {
-    description?: string;
-  };
+  initialData?: DescriptionData;
+  onSave: (data: DescriptionData) => Promise<void>;
+  experienceTypeId?: string; // For fetching gathering ideas
+  experienceTypeLabel?: string; // For popup titles
+  gatheringId?: string; // For saving gathering_idea reference
 }
 
 export const DescriptionSlider: React.FC<DescriptionSliderProps> = ({
   visible,
   onClose,
-  onSave,
   initialData,
+  onSave,
+  experienceTypeId,
+  experienceTypeLabel,
+  gatheringId,
 }) => {
-  const [formData, setFormData] = useState({
-    description: initialData?.description || '',
-  });
+  // Form state
+  const [description, setDescription] = useState(initialData?.description || '');
+  
+  // UI state
+  const [saving, setSaving] = useState(false);
+  const [showGatheringIdeasPopup, setShowGatheringIdeasPopup] = useState(false);
+  const [showSimpleHelpNote, setShowSimpleHelpNote] = useState(false);
+  const [popupView, setPopupView] = useState<'intro' | 'list' | 'detail'>('intro');
+  const [selectedIdea, setSelectedIdea] = useState<any>(null);
+  const [hasInteractedWithPopup, setHasInteractedWithPopup] = useState(false);
+  const [showAddInfo, setShowAddInfo] = useState(false);
+  
+  // Animation for magic wand
+  const wandAnim = useRef(new Animated.Value(0)).current;
 
-  // Update form data when initialData changes
+  // Get gathering ideas using the hook
+  const { gatheringIdeas, loading: ideasLoading, hasIdeas } = useGatheringIdeas(experienceTypeId);
+
+  // Initialize form when modal opens
   useEffect(() => {
-    setFormData({
-      description: initialData?.description || '',
-    });
-  }, [initialData]);
-
-  // Check if current data has unsaved changes
-  const hasUnsavedChanges = () => {
-    return formData.description !== (initialData?.description || '');
-  };
-
-  // Validate form data
-  const validateForm = () => {
-    const errors: string[] = [];
-    
-    if (!formData.description.trim()) {
-      errors.push('Description is required');
+    if (visible) {
+      console.log('🚀 DescriptionSlider opened, initialData:', initialData);
+      setDescription(initialData?.description || '');
+      setPopupView('intro');
+      setSelectedIdea(null);
+      setShowAddInfo(false);
     }
-    
-    if (formData.description.length > 500) {
-      errors.push('Description must be 500 characters or less');
-    }
-    
-    return errors;
-  };
+  }, [visible, initialData]);
+
+  // Animate magic wand
+  useEffect(() => {
+    const wandAnimation = () => {
+      Animated.sequence([
+        Animated.timing(wandAnim, {
+          toValue: 1,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(wandAnim, {
+          toValue: 0,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+      ]).start(() => wandAnimation());
+    };
+
+    wandAnimation();
+  }, []);
+
+  // Check if there are unsaved changes
+  const hasUnsavedChanges = description !== (initialData?.description || '');
 
   const handleSave = async () => {
-    const errors = validateForm();
-    if (errors.length > 0) {
-      throw new Error(errors.join(', '));
+    if (!hasUnsavedChanges) return;
+    
+    setSaving(true);
+    try {
+      console.log('💾 Saving description data...');
+      const dataToSave: DescriptionData = { description };
+      
+      await onSave(dataToSave);
+      console.log('✅ Description data saved successfully');
+      onClose();
+    } catch (error) {
+      console.error('❌ Error saving description data:', error);
+      // Keep modal open on error so user can retry
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleClose = () => {
+    if (saving) return; // Prevent close during save
+    onClose();
+  };
+
+  const handleGatheringIdeasLinkPress = () => {
+    if (!hasIdeas) {
+      // If no ideas, show simple help note modal
+      setShowSimpleHelpNote(true);
+      return;
     }
     
-    await onSave({
-      description: formData.description.trim(),
-    });
+    // If has ideas, proceed with normal popup logic
+    setHasInteractedWithPopup(true);
+    if (hasInteractedWithPopup) {
+      // Go directly to list view if user has already seen intro
+      setPopupView('list');
+    } else {
+      // Show intro view first time
+      setPopupView('intro');
+    }
+    setShowGatheringIdeasPopup(true);
   };
 
-  const handleCancel = () => {
-    // Reset to initial data
-    setFormData({
-      description: initialData?.description || '',
-    });
+  const handleAddIdeaToDescription = async (idea: any) => {
+    if (!idea.description_text) return;
+
+    // Add idea text to description
+    const newDescription = description + (description ? '\n\n' : '') + idea.description_text;
+    setDescription(newDescription);
+
+    // Save gathering_idea reference to gathering_other table
+    if (gatheringId) {
+      try {
+        const { error } = await supabase
+          .from('gathering_other')
+          .update({ gathering_idea: idea.id })
+          .eq('gathering', gatheringId);
+
+        if (error) {
+          console.error('Error saving gathering idea reference:', error);
+        } else {
+          console.log('✅ Gathering idea reference saved');
+        }
+      } catch (error) {
+        console.error('Error saving gathering idea reference:', error);
+      }
+    }
+
+    // Hide popup
+    setShowGatheringIdeasPopup(false);
+    setShowAddInfo(false);
   };
 
-  const handleDescriptionChange = (value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      description: value,
-    }));
+  // Get popup buttons based on current view
+  const getPopupButtons = (): PopupButton[] => {
+    switch (popupView) {
+      case 'intro':
+        return [
+          {
+            text: 'See How',
+            onPress: () => setPopupView('list'),
+            style: 'primary'
+          }
+        ];
+      case 'detail':
+        return [
+          {
+            text: 'Back',
+            onPress: () => setPopupView('list'),
+            style: 'secondary'
+          },
+          {
+            text: 'Add',
+            onPress: () => {
+              if (showAddInfo) {
+                handleAddIdeaToDescription(selectedIdea);
+              } else {
+                setShowAddInfo(true);
+              }
+            },
+            style: 'primary'
+          }
+        ];
+      default: // list
+        return [];
+    }
+  };
+
+  // Render popup content based on current view
+  const renderPopupContent = () => {
+    switch (popupView) {
+      case 'intro':
+        return (
+          <View style={styles.popupIntroContent}>
+            <Text style={styles.popupIntroText}>
+              Help your guests get closer to each other
+            </Text>
+          </View>
+        );
+
+      case 'list':
+        return (
+          <View style={styles.popupListContent}>
+            <Text style={styles.popupListTitle}>
+              {experienceTypeLabel} Idea{gatheringIdeas.length === 1 ? '' : 's'}
+            </Text>
+            <ScrollView style={styles.ideaList}>
+              {gatheringIdeas.map((idea) => (
+                <TouchableOpacity
+                  key={idea.id}
+                  style={styles.ideaListItem}
+                  onPress={() => {
+                    setSelectedIdea(idea);
+                    setPopupView('detail');
+                  }}
+                >
+                  <Text style={styles.ideaLabel}>{idea.label}</Text>
+                  <Text style={styles.ideaTag}>{idea.tag}</Text>
+                  <Text style={styles.ideaExploreLink}>explore</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        );
+
+      case 'detail':
+        return (
+          <View style={styles.popupDetailContent}>
+            <ScrollView>
+              <Text style={styles.popupDetailTitle}>{selectedIdea?.label}</Text>
+              
+              <View style={styles.detailSection}>
+                <Text style={styles.detailSectionTitle}>About</Text>
+                <Text style={styles.detailSectionContent}>{selectedIdea?.overview}</Text>
+              </View>
+              
+              <View style={styles.detailSection}>
+                <Text style={styles.detailSectionTitle}>Why It Works</Text>
+                <Text style={styles.detailSectionContent}>{selectedIdea?.why}</Text>
+              </View>
+              
+              {showAddInfo && (
+                <View style={styles.addInfo}>
+                  <Text style={styles.addInfoText}>
+                    We'll add {selectedIdea?.label?.toLowerCase()} to your gathering description
+                  </Text>
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        );
+
+      default:
+        return null;
+    }
   };
 
   return (
-    <StandardSlider
+    <Modal
       visible={visible}
-      onClose={onClose}
-      onSave={handleSave}
-      onCancel={handleCancel}
-      hasUnsavedChanges={hasUnsavedChanges()}
-      title="Description"
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={handleClose}
     >
-      <View style={styles.content}>
-        <TextArea
-          label="Gathering Description"
-          value={formData.description}
-          onValueChange={handleDescriptionChange}
-          placeholder="Describe your gathering's purpose, agenda, and what attendees can expect..."
-          maxLength={500}
-          required
-          showCharacterCount
-          numberOfLines={6}
-          minHeight={120}
-        />
+      <View style={styles.modalContainer}>
+        {/* Modal Header */}
+        <View style={styles.modalHeader}>
+          <View style={styles.headerContent}>
+            <View style={styles.headerLeft} />
+            <Text style={styles.modalTitle}>Description</Text>
+            <TouchableOpacity 
+              style={styles.modalCloseButton}
+              onPress={handleClose}
+            >
+              <Ionicons name="close" size={24} color={theme.colors.text.primary} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Scrollable Content */}
+        <View style={styles.contentContainer}>
+          <ScrollView style={styles.modalContent} contentContainerStyle={styles.scrollContent}>
+            
+            {/* Description Input */}
+            <MultiLineInput
+              label="Description"
+              value={description}
+              onValueChange={setDescription}
+              placeholder="Describe your gathering..."
+              numberOfLines={5}
+              minHeight={120} // Override for 5 lines (5 x 24px line height)
+              maxLength={750}
+              showCharacterCount={false}
+              required
+            />
+
+            {/* Magic Wand Link */}
+            <TouchableOpacity 
+              style={styles.magicLink}
+              onPress={handleGatheringIdeasLinkPress}
+            >
+              <View style={styles.magicIconContainer}>
+                <Animated.View 
+                  style={[
+                    styles.wandContainer,
+                    {
+                      transform: [
+                        {
+                          rotate: wandAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: ['0deg', '15deg'],
+                          }),
+                        },
+                      ],
+                    },
+                  ]}
+                >
+                  <FontAwesome5 name="magic" size={20} color="#333333" />
+                </Animated.View>
+              </View>
+              
+              <Text style={styles.magicLinkText}>The secret to hosting</Text>
+            </TouchableOpacity>
+
+            {/* Extra padding at bottom for floating buttons */}
+            <View style={styles.bottomPadding} />
+          </ScrollView>
+        </View>
+
+        {/* Fixed bottom buttons - floating over scrolling content */}
+        <View style={styles.modalButtons}>
+          <TouchableOpacity 
+            style={styles.cancelButton}
+            onPress={handleClose}
+          >
+            <Text style={styles.cancelButtonText}>Cancel</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[
+              styles.saveButton,
+              !hasUnsavedChanges && styles.saveButtonInactive
+            ]}
+            onPress={handleSave}
+            disabled={!hasUnsavedChanges || saving}
+          >
+            <Text style={[
+              styles.saveButtonText,
+              !hasUnsavedChanges && styles.saveButtonTextInactive
+            ]}>
+              {saving ? 'Saving...' : 'Save'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Simple Help Note Modal - for hasIdeas false case */}
+        <Modal
+          visible={showSimpleHelpNote}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowSimpleHelpNote(false)}
+        >
+          <TouchableOpacity 
+            style={styles.simpleModalOverlay}
+            activeOpacity={1}
+            onPress={() => setShowSimpleHelpNote(false)}
+          >
+            <TouchableOpacity 
+              style={styles.simpleModalContent}
+              activeOpacity={1}
+              onPress={() => {}} // Prevent close when tapping content
+            >
+              <Text style={styles.simpleModalText}>
+                Help your guests get closer to each other
+              </Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </Modal>
+
+        {/* Gathering Ideas Popup - for hasIdeas true case */}
+        {hasIdeas && (
+          <StandardPopup
+            visible={showGatheringIdeasPopup}
+            onClose={() => {
+              setShowGatheringIdeasPopup(false);
+              setShowAddInfo(false);
+            }}
+            title={popupView === 'intro' ? 'Gathering Ideas' : 
+                  popupView === 'list' ? `${experienceTypeLabel} Ideas` :
+                  selectedIdea?.label || 'Idea Detail'}
+            buttons={getPopupButtons()}
+            height={popupView === 'detail' ? 400 : 280}
+          >
+            {renderPopupContent()}
+          </StandardPopup>
+        )}
+
       </View>
-    </StandardSlider>
+    </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  content: {
-    gap: theme.spacing.md,
+  // Modal styles - matching TitleAndHostsSlider exactly
+  modalContainer: {
+    flex: 1,
+    backgroundColor: theme.colors.background.secondary,
   },
-}); 
+  modalHeader: {
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.lg,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  headerLeft: {
+    width: 24 + (theme.spacing.sm * 2), // Same width as close button + padding
+  },
+  modalTitle: {
+    fontSize: theme.typography.sizes.lg,
+    fontWeight: theme.typography.weights.bold,
+    color: theme.colors.text.primary,
+    textAlign: 'center',
+    flex: 1,
+  },
+  modalCloseButton: {
+    padding: theme.spacing.sm,
+  },
+  contentContainer: {
+    flex: 1,
+  },
+  modalContent: {
+    flex: 1,
+    paddingHorizontal: theme.spacing.lg,
+  },
+  scrollContent: {
+    paddingTop: 16, // Space for floating labels
+    paddingBottom: 120, // Extra space for floating buttons
+    gap: theme.spacing.input_spacing, // 54px spacing between all elements
+  },
+
+  // Magic Wand Link styles
+  magicLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'center',
+    marginTop: theme.spacing.input_spacing * 2, // Two input spacings as requested
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+  },
+  magicIconContainer: {
+    position: 'relative',
+    marginRight: theme.spacing.sm,
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  wandContainer: {
+    position: 'absolute',
+  },
+  magicLinkText: {
+    color: theme.colors.text.secondary,
+    fontSize: theme.typography.sizes.md,
+    fontStyle: 'italic',
+  },
+
+  // Popup content styles
+  popupIntroContent: {
+    alignItems: 'center',
+    paddingVertical: theme.spacing.md,
+  },
+  popupIntroText: {
+    fontSize: theme.typography.sizes.lg,
+    fontWeight: theme.typography.weights.medium,
+    color: theme.colors.text.primary,
+    textAlign: 'center',
+    lineHeight: 24,
+  },
+
+  // List view styles
+  popupListContent: {
+    flex: 1,
+  },
+  popupListTitle: {
+    fontSize: theme.typography.sizes.lg,
+    fontWeight: theme.typography.weights.bold,
+    color: theme.colors.text.primary,
+    textAlign: 'center',
+    marginBottom: theme.spacing.md,
+  },
+  ideaList: {
+    flex: 1,
+  },
+  ideaListItem: {
+    backgroundColor: theme.colors.background.tertiary,
+    borderRadius: theme.spacing.sm,
+    padding: theme.spacing.md,
+    marginBottom: theme.spacing.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.border.light,
+  },
+  ideaLabel: {
+    fontSize: theme.typography.sizes.md,
+    fontWeight: theme.typography.weights.semibold,
+    color: theme.colors.text.primary,
+    marginBottom: theme.spacing.xs,
+  },
+  ideaTag: {
+    fontSize: theme.typography.sizes.sm,
+    color: theme.colors.text.secondary,
+    marginBottom: theme.spacing.sm,
+    fontStyle: 'italic',
+  },
+  ideaExploreLink: {
+    fontSize: theme.typography.sizes.sm,
+    color: theme.colors.primary,
+    fontWeight: theme.typography.weights.medium,
+    textAlign: 'right',
+  },
+
+  // Detail view styles
+  popupDetailContent: {
+    flex: 1,
+  },
+  popupDetailTitle: {
+    fontSize: theme.typography.sizes.lg,
+    fontWeight: theme.typography.weights.bold,
+    color: theme.colors.text.primary,
+    textAlign: 'center',
+    marginBottom: theme.spacing.lg,
+  },
+  detailSection: {
+    marginBottom: theme.spacing.lg,
+  },
+  detailSectionTitle: {
+    fontSize: theme.typography.sizes.md,
+    fontWeight: theme.typography.weights.bold,
+    color: theme.colors.text.primary,
+    marginBottom: theme.spacing.sm,
+  },
+  detailSectionContent: {
+    fontSize: theme.typography.sizes.sm,
+    color: theme.colors.text.secondary,
+    lineHeight: 20,
+  },
+  addInfo: {
+    backgroundColor: theme.colors.background.tertiary,
+    borderRadius: theme.spacing.sm,
+    padding: theme.spacing.md,
+    marginTop: theme.spacing.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border.light,
+  },
+  addInfoText: {
+    fontSize: theme.typography.sizes.sm,
+    color: theme.colors.text.primary,
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+
+  // Bottom padding
+  bottomPadding: {
+    height: 20,
+  },
+
+  // Fixed bottom buttons - matching TitleAndHostsSlider exactly
+  modalButtons: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    padding: theme.spacing.lg + 20,
+    gap: theme.spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border.light,
+    backgroundColor: theme.colors.background.secondary,
+    alignItems: 'center',
+  },
+  cancelButton: {
+    flex: 1,
+    backgroundColor: theme.colors.background.tertiary,
+    borderRadius: theme.spacing.md,
+    paddingVertical: theme.spacing.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelButtonText: {
+    fontSize: theme.typography.sizes.md,
+    fontWeight: theme.typography.weights.medium,
+    color: theme.colors.text.secondary,
+  },
+  saveButton: {
+    flex: 1,
+    backgroundColor: theme.colors.primary,
+    borderRadius: theme.spacing.md,
+    paddingVertical: theme.spacing.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  saveButtonInactive: {
+    backgroundColor: 'rgba(19, 190, 199, 0.35)',
+  },
+  saveButtonText: {
+    fontSize: theme.typography.sizes.md,
+    fontWeight: theme.typography.weights.semibold,
+    color: theme.colors.text.inverse,
+  },
+  saveButtonTextInactive: {
+    color: theme.colors.text.secondary,
+  },
+
+  // Simple modal styles
+  simpleModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: theme.spacing.xl,
+  },
+  simpleModalContent: {
+    backgroundColor: theme.colors.background.primary,
+    borderRadius: theme.spacing.md,
+    paddingVertical: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.xl,
+    maxWidth: 280,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  simpleModalText: {
+    fontSize: theme.typography.sizes.md,
+    fontWeight: theme.typography.weights.medium,
+    color: theme.colors.text.primary,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+});

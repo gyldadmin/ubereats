@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal, Animated } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
 import { SingleLineInput, MultiLineInput } from './inputs';
@@ -39,9 +39,6 @@ export const LocationSlider: React.FC<LocationSliderProps> = ({
   const [saving, setSaving] = useState(false);
   const [meetingLinkError, setMeetingLinkError] = useState<string>('');
   const [remoteLinkPressed, setRemoteLinkPressed] = useState(false);
-  
-  // Animation for smooth remote toggle
-  const remoteTransition = useState(new Animated.Value(remote ? 1 : 0))[0];
 
   // Initialize form when modal opens
   useEffect(() => {
@@ -53,11 +50,8 @@ export const LocationSlider: React.FC<LocationSliderProps> = ({
       setRemote(initialData?.remote || false);
       setMeetingLinkError('');
       setSaving(false);
-      
-      // Set initial animation state
-      remoteTransition.setValue(initialData?.remote ? 1 : 0);
     }
-  }, [visible, initialData, remoteTransition]);
+  }, [visible, initialData]);
 
   // URL validation function
   const isValidUrl = (url: string): boolean => {
@@ -80,17 +74,10 @@ export const LocationSlider: React.FC<LocationSliderProps> = ({
     }
   };
 
-  // Handle remote toggle with smooth animation
+  // Handle remote toggle
   const handleRemoteToggle = () => {
     const newRemoteValue = !remote;
     setRemote(newRemoteValue);
-    
-    // Animate the transition
-    Animated.timing(remoteTransition, {
-      toValue: newRemoteValue ? 1 : 0,
-      duration: 300,
-      useNativeDriver: false,
-    }).start();
   };
 
   // Check if form has unsaved changes
@@ -141,58 +128,6 @@ export const LocationSlider: React.FC<LocationSliderProps> = ({
     return allowedTypes.includes(experienceType);
   };
 
-  // Render in-person inputs
-  const renderInPersonInputs = () => (
-    <Animated.View style={{ opacity: Animated.subtract(1, remoteTransition) }}>
-      {/* Address Input */}
-      <SingleLineInput
-        label="Address"
-        value={address}
-        onValueChange={setAddress}
-        disabled={locationTbd}
-        placeholder="Enter gathering address"
-      />
-      
-      {/* Location TBD Checkbox - 3px margin below address, right justified */}
-      <View style={styles.checkboxContainer}>
-        <CustomCheckbox
-          label="Location TBD"
-          value={locationTbd}
-          onValueChange={setLocationTbd}
-        />
-      </View>
-      
-      {/* Instructions Input */}
-      <MultiLineInput
-        label="Instructions"
-        value={locationInstructions}
-        onValueChange={setLocationInstructions}
-        placeholder="Instructions (e.g. 'Check in at reception, go to the 20th floor, turn right')"
-        disabled={locationTbd}
-        numberOfLines={2}
-        maxLength={200}
-        showCharacterCount={true}
-        characterCountPosition="bottom-right"
-      />
-    </Animated.View>
-  );
-
-  // Render remote inputs
-  const renderRemoteInputs = () => (
-    <Animated.View style={{ opacity: remoteTransition }}>
-      {/* Meeting Link Input */}
-      <SingleLineInput
-        label="Meeting Link"
-        value={meetingLink}
-        onValueChange={handleMeetingLinkChange}
-        placeholder="https://zoom.us/..."
-        error={!!meetingLinkError}
-        helperText={meetingLinkError}
-        autoCapitalize="none"
-      />
-    </Animated.View>
-  );
-
   return (
     <Modal
       visible={visible}
@@ -218,8 +153,88 @@ export const LocationSlider: React.FC<LocationSliderProps> = ({
             
             {/* Conditional rendering based on remote state */}
             <View style={styles.inputsContainer}>
-              {!remote && renderInPersonInputs()}
-              {remote && renderRemoteInputs()}
+              {/* Remote Inputs - positioned first so they show at top */}
+              <View style={{opacity: remote ? 1 : 0, pointerEvents: remote ? 'auto' : 'none'}}>
+                {/* Meeting Link Input - only show when remote */}
+                {remote && (
+                  <SingleLineInput
+                    label="Meeting Link"
+                    value={meetingLink}
+                    onValueChange={handleMeetingLinkChange}
+                    placeholder="https://zoom.us/..."
+                    error={!!meetingLinkError}
+                    autoCapitalize="none"
+                  />
+                )}
+              </View>
+
+              {/* In-Person Inputs */}
+              <View style={{opacity: remote ? 0 : 1, pointerEvents: remote ? 'none' : 'auto'}}>
+                {/* Address Input - only show when not remote */}
+                {!remote && (
+                  <SingleLineInput
+                    label="Address"
+                    value={address}
+                    onValueChange={setAddress}
+                    disabled={locationTbd}
+                    placeholder="Enter gathering address"
+                  />
+                )}
+                
+                {/* Address TBD Checkbox - always takes space, invisible when remote */}
+                <View style={[styles.checkboxContainer, {backgroundColor: 'transparent', marginTop: 8, marginBottom: theme.spacing.input_spacing}]}>
+                  <TouchableOpacity
+                    onPress={() => setLocationTbd(!locationTbd)}
+                    style={{
+                      flexDirection: 'row-reverse',
+                      alignItems: 'center',
+                      alignSelf: 'flex-end',
+                    }}
+                  >
+                    <View
+                      style={{
+                        width: 16,
+                        height: 16,
+                        borderWidth: 1,
+                        borderRadius: 3,
+                        borderColor: locationTbd ? theme.colors.text.tertiary : theme.colors.border.light,
+                        backgroundColor: locationTbd ? theme.colors.text.tertiary : 'transparent',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        marginLeft: 8,
+                      }}
+                    >
+                      {locationTbd && (
+                        <View
+                          style={{
+                            width: 5,
+                            height: 8,
+                            borderRightWidth: 2,
+                            borderBottomWidth: 2,
+                            borderColor: 'white',
+                            transform: [{ rotate: '45deg' }],
+                            marginTop: -1,
+                          }}
+                        />
+                      )}
+                    </View>
+                    <Text style={{color: theme.colors.text.tertiary, fontSize: 14, lineHeight: 16}}>Address TBD</Text>
+                  </TouchableOpacity>
+                </View>
+                
+                {/* Instructions Input - always takes space, invisible when remote */}
+                <MultiLineInput
+                  label="Instructions / Getting In"
+                  value={locationInstructions}
+                  onValueChange={setLocationInstructions}
+                  placeholder="Instructions (e.g. 'Check in at reception, go to the 20th floor, turn right')"
+                  disabled={locationTbd}
+                  numberOfLines={2}
+                  maxLength={200}
+                  showCharacterCount={false}
+                  characterCountPosition="bottom-right"
+                />
+              </View>
             </View>
 
             {/* Remote Toggle Link - only visible for certain experience types */}
@@ -235,7 +250,7 @@ export const LocationSlider: React.FC<LocationSliderProps> = ({
                     styles.remoteToggleText,
                     remoteLinkPressed && styles.remoteToggleTextPressed
                   ]}>
-                    {remote ? 'Make This Gathering In-Person' : 'Make This Gathering Remote'}
+                    {remote ? 'Switch to In-Person' : 'Switch to Remote'}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -319,11 +334,21 @@ const styles = StyleSheet.create({
   
   // Input container styles
   inputsContainer: {
-    minHeight: 200, // Ensure smooth transitions
+    // Container for input fields
   },
   checkboxContainer: {
-    alignItems: 'flex-end', // Right justify
     marginTop: 3, // 3px margin as requested
+    alignItems: 'flex-end', // Right justify the checkbox
+  },
+  checkboxStyle: {
+    alignSelf: 'flex-end', // Right align the entire checkbox component
+    marginBottom: 0, // Override default margin
+    marginRight: 0, // Remove any margin
+  },
+  checkboxLabelStyle: {
+    color: '#333333', // Ensure label is visible with explicit dark gray
+    fontSize: 14,
+    fontWeight: '500',
   },
   
   // Remote toggle styles
@@ -332,8 +357,8 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing.input_spacing,
   },
   remoteToggleText: {
-    color: theme.colors.text.tertiary,
-    fontSize: theme.typography.sizes.md,
+    color: theme.colors.text.tertiary, // Match checkbox color
+    fontSize: 14, // Match checkbox font size
     fontWeight: theme.typography.weights.medium,
   },
   remoteToggleTextPressed: {

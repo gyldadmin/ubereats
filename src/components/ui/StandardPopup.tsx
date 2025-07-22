@@ -1,14 +1,11 @@
 import React from 'react';
-import { View, StyleSheet, TouchableOpacity, Modal, Text } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { View, Text, TouchableOpacity, Modal, StyleSheet } from 'react-native';
 import { theme } from '../../styles/theme';
 
-export type ButtonStyle = 'primary' | 'secondary' | 'destructive';
-
-export interface ButtonConfig {
+export interface PopupButton {
   text: string;
   onPress: () => void;
-  style?: ButtonStyle;
+  style?: 'primary' | 'secondary' | 'tertiary';
   disabled?: boolean;
 }
 
@@ -16,111 +13,103 @@ interface StandardPopupProps {
   visible: boolean;
   onClose: () => void;
   title: string;
-  message: string;
-  buttons: 1 | 2;
-  primaryButton: ButtonConfig;
-  secondaryButton?: ButtonConfig; // Required when buttons = 2
-  closeOnOverlayTap?: boolean;
-  showCloseButton?: boolean;
+  children: React.ReactNode;
+  buttons: PopupButton[];
+  width?: number;
+  height?: number;
+  closeOnOverlay?: boolean;
 }
 
 export const StandardPopup: React.FC<StandardPopupProps> = ({
   visible,
   onClose,
   title,
-  message,
+  children,
   buttons,
-  primaryButton,
-  secondaryButton,
-  closeOnOverlayTap = true,
-  showCloseButton = true,
+  width = 320,
+  height = 280,
+  closeOnOverlay = true,
 }) => {
+
   const handleOverlayPress = () => {
-    if (closeOnOverlayTap) {
+    if (closeOnOverlay) {
       onClose();
     }
   };
 
-  const getButtonStyles = (buttonStyle: ButtonStyle = 'primary', disabled: boolean = false) => {
-    let buttonStyles: any[] = [styles.button];
-    let textStyles: any[] = [styles.buttonText];
-
-    switch (buttonStyle) {
+  const getButtonStyle = (style: PopupButton['style']) => {
+    switch (style) {
       case 'primary':
-        buttonStyles.push(disabled ? styles.buttonPrimaryDisabled : styles.buttonPrimary);
-        textStyles.push(disabled ? styles.buttonTextPrimaryDisabled : styles.buttonTextPrimary);
-        break;
+        return styles.primaryButton;
       case 'secondary':
-        buttonStyles.push(disabled ? styles.buttonSecondaryDisabled : styles.buttonSecondary);
-        textStyles.push(disabled ? styles.buttonTextSecondaryDisabled : styles.buttonTextSecondary);
-        break;
-      case 'destructive':
-        buttonStyles.push(disabled ? styles.buttonDestructiveDisabled : styles.buttonDestructive);
-        textStyles.push(disabled ? styles.buttonTextDestructiveDisabled : styles.buttonTextDestructive);
-        break;
+        return styles.secondaryButton;
+      case 'tertiary':
+      default:
+        return styles.tertiaryButton;
     }
-
-    return { buttonStyle: buttonStyles, textStyle: textStyles };
   };
 
-  const renderButton = (config: ButtonConfig, isSecondary: boolean = false) => {
-    const { buttonStyle, textStyle } = getButtonStyles(config.style, config.disabled);
+  const getButtonTextStyle = (style: PopupButton['style'], disabled?: boolean) => {
+    if (disabled) {
+      return styles.disabledButtonText;
+    }
     
-    return (
-      <TouchableOpacity
-        key={isSecondary ? 'secondary' : 'primary'}
-        style={[buttonStyle, buttons === 2 && styles.buttonHalfWidth]}
-        onPress={config.onPress}
-        disabled={config.disabled}
-        activeOpacity={0.8}
-      >
-        <Text style={textStyle}>{config.text}</Text>
-      </TouchableOpacity>
-    );
+    switch (style) {
+      case 'primary':
+        return styles.primaryButtonText;
+      case 'secondary':
+        return styles.secondaryButtonText;
+      case 'tertiary':
+      default:
+        return styles.tertiaryButtonText;
+    }
   };
 
   return (
     <Modal
       visible={visible}
-      transparent={true}
+      transparent
       animationType="fade"
       onRequestClose={onClose}
     >
       <TouchableOpacity 
-        style={styles.overlay} 
-        activeOpacity={1} 
+        style={styles.overlayContainer}
         onPress={handleOverlayPress}
+        activeOpacity={1}
       >
         <TouchableOpacity 
-          style={styles.popupContainer} 
+          style={[styles.popupContainer, { width, height }]}
           activeOpacity={1}
-          onPress={() => {}} // Prevent closing when tapping inside popup
+          onPress={(e) => e.stopPropagation()} // Prevent overlay close when touching popup
         >
-          {/* Close button X in top-right corner */}
-          {showCloseButton && (
-            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-              <Ionicons name="close" size={24} color={theme.colors.text.secondary} />
-            </TouchableOpacity>
-          )}
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={styles.title}>{title}</Text>
+          </View>
 
           {/* Content */}
           <View style={styles.content}>
-            <Text style={styles.title}>{title}</Text>
-            <Text style={styles.message}>{message}</Text>
+            {children}
           </View>
 
-          {/* Button area */}
-          <View style={[
-            styles.buttonContainer,
-            buttons === 2 ? styles.buttonContainerTwoButtons : styles.buttonContainerOneButton
-          ]}>
-            {buttons === 2 && secondaryButton && (
-              <>
-                {renderButton(secondaryButton, true)}
-                {renderButton(primaryButton, false)}
-              </>
-            )}
-            {buttons === 1 && renderButton(primaryButton, false)}
+          {/* Buttons */}
+          <View style={styles.buttonContainer}>
+            {buttons.map((button, index) => (
+              <TouchableOpacity
+                key={index}
+                style={[
+                  styles.button,
+                  getButtonStyle(button.style),
+                  button.disabled && styles.disabledButton
+                ]}
+                onPress={button.onPress}
+                disabled={button.disabled}
+              >
+                <Text style={getButtonTextStyle(button.style, button.disabled)}>
+                  {button.text}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
         </TouchableOpacity>
       </TouchableOpacity>
@@ -129,121 +118,92 @@ export const StandardPopup: React.FC<StandardPopupProps> = ({
 };
 
 const styles = StyleSheet.create({
-  overlay: {
+  overlayContainer: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: theme.spacing.lg,
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   popupContainer: {
     backgroundColor: theme.colors.background.secondary,
-    borderRadius: 12,
-    width: 320,
-    minHeight: 200,
-    elevation: 8,
+    borderRadius: theme.spacing.md,
+    padding: theme.spacing.lg,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
     shadowOpacity: 0.3,
     shadowRadius: 8,
+    elevation: 8,
   },
-  closeButton: {
-    position: 'absolute',
-    top: theme.spacing.md,
-    right: theme.spacing.md,
-    zIndex: 1,
-    padding: theme.spacing.xs,
-  },
-  content: {
-    padding: theme.spacing.lg,
-    paddingTop: theme.spacing.lg + theme.spacing.lg, // Extra space for X button
-    paddingBottom: theme.spacing.md,
+  header: {
+    alignItems: 'center',
+    marginBottom: theme.spacing.md,
   },
   title: {
     fontSize: theme.typography.sizes.lg,
     fontWeight: theme.typography.weights.bold,
     color: theme.colors.text.primary,
     textAlign: 'center',
-    marginBottom: theme.spacing.md,
-    lineHeight: 24,
   },
-  message: {
-    fontSize: theme.typography.sizes.md,
-    color: theme.colors.text.secondary,
-    textAlign: 'center',
-    lineHeight: 22,
+  content: {
+    flex: 1,
+    justifyContent: 'center',
   },
   buttonContainer: {
-    paddingHorizontal: theme.spacing.lg,
-    paddingBottom: theme.spacing.lg,
-  },
-  buttonContainerOneButton: {
-    // Single button takes full width
-  },
-  buttonContainerTwoButtons: {
     flexDirection: 'row',
-    gap: theme.spacing.md,
+    justifyContent: 'space-between',
+    gap: theme.spacing.sm,
+    marginTop: theme.spacing.md,
   },
   button: {
-    borderRadius: theme.spacing.md,
-    paddingVertical: theme.spacing.lg,
+    flex: 1,
+    paddingVertical: theme.spacing.sm + 2,
+    borderRadius: theme.spacing.sm,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 44,
   },
-  buttonHalfWidth: {
-    flex: 1, // For two-button layout
+  
+  // Primary button (brand color, white text)
+  primaryButton: {
+    backgroundColor: theme.colors.primary,
   },
-  buttonText: {
+  primaryButtonText: {
+    color: theme.colors.text.inverse,
     fontSize: theme.typography.sizes.md,
     fontWeight: theme.typography.weights.semibold,
   },
   
-  // Primary button styles
-  buttonPrimary: {
-    backgroundColor: theme.colors.primary,
+  // Secondary button (light background, dark text)
+  secondaryButton: {
+    backgroundColor: theme.colors.background.tertiary,
+    borderWidth: 1,
+    borderColor: theme.colors.border.light,
   },
-  buttonPrimaryDisabled: {
-    backgroundColor: 'rgba(19, 190, 199, 0.35)',
-  },
-  buttonTextPrimary: {
-    color: theme.colors.text.inverse,
-  },
-  buttonTextPrimaryDisabled: {
-    color: theme.colors.text.secondary,
+  secondaryButtonText: {
+    color: theme.colors.text.primary,
+    fontSize: theme.typography.sizes.md,
+    fontWeight: theme.typography.weights.medium,
   },
   
-  // Secondary button styles
-  buttonSecondary: {
-    backgroundColor: theme.colors.background.tertiary,
+  // Tertiary button (minimal styling, link-like)
+  tertiaryButton: {
+    backgroundColor: 'transparent',
   },
-  buttonSecondaryDisabled: {
-    backgroundColor: theme.colors.background.tertiary,
-    opacity: 0.5,
-  },
-  buttonTextSecondary: {
+  tertiaryButtonText: {
     color: theme.colors.text.secondary,
-  },
-  buttonTextSecondaryDisabled: {
-    color: theme.colors.text.secondary,
-    opacity: 0.5,
+    fontSize: theme.typography.sizes.md,
+    fontWeight: theme.typography.weights.medium,
   },
   
-  // Destructive button styles
-  buttonDestructive: {
-    backgroundColor: '#dc3545', // Red color for dangerous actions
-  },
-  buttonDestructiveDisabled: {
-    backgroundColor: '#dc3545',
+  // Disabled state
+  disabledButton: {
     opacity: 0.5,
   },
-  buttonTextDestructive: {
-    color: '#ffffff',
+  disabledButtonText: {
+    color: theme.colors.text.tertiary,
+    fontSize: theme.typography.sizes.md,
+    fontWeight: theme.typography.weights.medium,
   },
-  buttonTextDestructiveDisabled: {
-    color: '#ffffff',
-    opacity: 0.5,
-  },
-});
-
-export default StandardPopup; 
+}); 

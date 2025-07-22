@@ -4,7 +4,7 @@ import { Text } from 'react-native-paper';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
-import { NavigationListItem, SetupListItem, TitleAndHostsSlider, DateTimeSlider, LocationSlider, MentorSlider, DescriptionSlider, GatheringTypeSlider } from '../../components/ui';
+import { NavigationListItem, SetupListItem, TitleAndHostsSlider, DateTimeSlider, LocationSlider, MentorSlider, DescriptionSlider, GatheringTypeSlider, SettingsSlider } from '../../components/ui';
 import { useHostData } from '../../hooks/useHostData';
 import { useGatheringSetup } from '../../hooks/useGatheringSetup';
 import { useSliderForm } from '../../hooks/useSliderForm';
@@ -50,9 +50,18 @@ export default function GatheringSetupScreen() {
   const [showLocationSlider, setShowLocationSlider] = useState(false);
   const [showMentorSlider, setShowMentorSlider] = useState(false);
   const [showDescriptionSlider, setShowDescriptionSlider] = useState(false);
+  const [showSettingsSlider, setShowSettingsSlider] = useState(false);
 
   const handleTipsAndFAQs = () => {
     (navigation as any).navigate('GatheringResources');
+  };
+
+  const handleSettings = () => {
+    console.log('Opening Settings slider');
+    console.log('Current showSettingsSlider state:', showSettingsSlider);
+    console.log('gatheringDetail?.gatheringOther:', gatheringDetail?.gatheringOther);
+    setShowSettingsSlider(true);
+    console.log('Set showSettingsSlider to true');
   };
 
   const handleGatheringType = () => {
@@ -65,6 +74,7 @@ export default function GatheringSetupScreen() {
     setShowLocationSlider(false);
     setShowMentorSlider(false);
     setShowDescriptionSlider(false);
+    setShowSettingsSlider(false);
     
     // Then open the GatheringTypeSlider
     setShowGatheringTypeSlider(true);
@@ -167,6 +177,97 @@ export default function GatheringSetupScreen() {
     setShowDescriptionSlider(true);
   };
 
+  // Handle settings save
+  const handleSettingsSave = async (data: any) => {
+    try {
+      await saveGatheringData(async () => {
+        console.log('💾 Saving settings data:', data);
+        
+        // Update gathering_other table with all settings data
+        const { error: otherError } = await supabase
+          .from('gathering_other')
+          .update({
+            cap: data.cap,
+            payment_to_member: data.payment_to_member,
+            payment_for: data.payment_for,
+            payment_amount: data.payment_amount,
+            payment_venmo: data.payment_venmo,
+            hold_autoreminders: data.hold_autoreminders,
+            signup_question: data.signup_question,
+            plus_guests: data.plus_guests,
+            potluck: data.potluck,
+          })
+          .eq('gathering', gatheringId);
+
+        if (otherError) {
+          console.error('Error saving settings data:', otherError);
+          throw otherError;
+        }
+
+        console.log('✅ Settings data saved successfully');
+      }, false); // Don't change status for settings changes
+    } catch (error) {
+      console.error('Error saving settings:', error);
+      throw error;
+    }
+  };
+
+  // Handle potluck contribution
+  const handlePotluckContribution = async (contribution: string) => {
+    try {
+      // Query current user from auth store
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        throw new Error('User authentication required');
+      }
+
+      // Check if user already has a potluck entry for this gathering
+      const { data: existingRecord, error: checkError } = await supabase
+        .from('potluck')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('gathering_id', gatheringId)
+        .maybeSingle();
+
+      if (checkError) {
+        console.error('Error checking existing potluck record:', checkError);
+        throw checkError;
+      }
+
+      if (existingRecord) {
+        // Update existing record
+        const { error: updateError } = await supabase
+          .from('potluck')
+          .update({ contribution: contribution.trim() })
+          .eq('id', existingRecord.id);
+
+        if (updateError) {
+          console.error('Error updating potluck record:', updateError);
+          throw updateError;
+        }
+      } else {
+        // Create new record
+        const { error: insertError } = await supabase
+          .from('potluck')
+          .insert({
+            user_id: user.id,
+            gathering_id: gatheringId,
+            contribution: contribution.trim()
+          });
+
+        if (insertError) {
+          console.error('Error creating potluck record:', insertError);
+          throw insertError;
+        }
+      }
+
+      console.log('✅ Potluck contribution saved successfully');
+    } catch (error) {
+      console.error('Error handling potluck contribution:', error);
+      throw error;
+    }
+  };
+
   // Show loading state during initialization
   if (initializationLoading) {
     return (
@@ -232,11 +333,14 @@ export default function GatheringSetupScreen() {
           onPress={handleLocation}
         />
         
-        <SetupListItem
-          title="Mentor"
-          status={getSetupItemState('mentor').status}
-          onPress={handleMentor}
-        />
+        {/* Only show mentor setup item for Mentoring experience types */}
+        {gatheringDetail?.gathering?.experience_type?.label === 'Mentoring' && (
+          <SetupListItem
+            title="Mentor"
+            status={getSetupItemState('mentor').status}
+            onPress={handleMentor}
+          />
+        )}
         
         <SetupListItem
           title="Description"
@@ -245,10 +349,14 @@ export default function GatheringSetupScreen() {
         />
         
         {/* Ideas and FAQ link */}
-        <TouchableOpacity style={styles.ideasFAQRow} onPress={handleTipsAndFAQs}>
-          <Text style={styles.ideasFAQText}>Ideas and FAQ &gt;</Text>
-          <Feather name="settings" size={20} color={theme.colors.text.secondary} />
-        </TouchableOpacity>
+        <View style={styles.ideasFAQRow}>
+          <TouchableOpacity onPress={handleTipsAndFAQs}>
+            <Text style={styles.ideasFAQText}>Ideas and FAQ &gt;</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleSettings}>
+            <Feather name="settings" size={20} color={theme.colors.text.secondary} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Gathering Type Slider */}
@@ -373,7 +481,7 @@ export default function GatheringSetupScreen() {
               const { error: otherError } = await supabase
                 .from('gathering_other')
                 .update(otherUpdates)
-                .eq('gathering_id', gatheringId);
+                .eq('gathering', gatheringId);
 
               if (otherError) {
                 console.error('Error updating gathering other:', otherError);
@@ -390,21 +498,34 @@ export default function GatheringSetupScreen() {
       <MentorSlider
         visible={showMentorSlider}
         onClose={() => setShowMentorSlider(false)}
+        experienceType={gatheringDetail?.gathering?.experience_type?.label}
         initialData={{
-          mentorIds: Array.isArray(gatheringDetail?.gatheringDisplay?.mentor) 
+          mentors: Array.isArray(gatheringDetail?.gatheringDisplay?.mentor) 
             ? gatheringDetail.gatheringDisplay.mentor 
             : (gatheringDetail?.gatheringDisplay?.mentor ? [gatheringDetail.gatheringDisplay.mentor] : []),
+          learningTopic: typeof gatheringDetail?.gatheringDisplay?.learning_topic === 'string'
+            ? gatheringDetail.gatheringDisplay.learning_topic
+            : (gatheringDetail?.gatheringDisplay?.learning_topic as any)?.id || '',
         }}
-        mentorOptions={activeMentors?.map(mentor => ({
-          value: mentor.user_id || mentor.id,
-          label: mentor.full_name || 'Unknown Mentor',
-          expertise: mentor.title || mentor.bio,
-        })) || []}
         onSave={async (data) => {
           await saveGatheringData(async () => {
-            console.log('Saving mentors:', data);
-            // TODO: Implement actual save to database
-            // Will save data.mentorIds to gathering_displays.mentor (UUID[])
+            console.log('💾 Saving mentor data:', data);
+            
+            // Update gathering_displays with mentor array and learning_topic
+            const { error: displayError } = await supabase
+              .from('gathering_displays')
+              .update({
+                mentor: data.mentors,
+                learning_topic: data.learningTopic || null
+              })
+              .eq('gathering_id', gatheringId);
+
+            if (displayError) {
+              console.error('Error saving mentor data:', displayError);
+              throw displayError;
+            }
+
+            console.log('✅ Mentor data saved successfully');
           }, true);
         }}
       />
@@ -416,12 +537,56 @@ export default function GatheringSetupScreen() {
         initialData={{
           description: gatheringDetail?.gatheringDisplay?.description || '',
         }}
+        experienceTypeId={
+          typeof gatheringDetail?.gathering?.experience_type === 'string' 
+            ? gatheringDetail.gathering.experience_type 
+            : (gatheringDetail?.gathering?.experience_type as any)?.id || ''
+        }
+        experienceTypeLabel={
+          typeof gatheringDetail?.gathering?.experience_type === 'string' 
+            ? gatheringDetail.gathering.experience_type 
+            : (gatheringDetail?.gathering?.experience_type as any)?.label || ''
+        }
+        gatheringId={gatheringId || ''}
         onSave={async (data) => {
           await saveGatheringData(async () => {
-            console.log('Saving description:', data);
-            // TODO: Implement actual save to database
+            console.log('💾 Saving description data:', data);
+            
+            // Update gathering_displays with description
+            const { error: displayError } = await supabase
+              .from('gathering_displays')
+              .update({
+                description: data.description
+              })
+              .eq('gathering_id', gatheringId);
+
+            if (displayError) {
+              console.error('Error saving description data:', displayError);
+              throw displayError;
+            }
+
+            console.log('✅ Description data saved successfully');
           }, true);
         }}
+      />
+
+      {/* Settings Slider */}
+      <SettingsSlider
+        visible={showSettingsSlider}
+        onClose={() => setShowSettingsSlider(false)}
+        initialData={{
+          cap: gatheringDetail?.gatheringOther?.cap || null,
+          payment_to_member: gatheringDetail?.gatheringOther?.payment_to_member || false,
+          payment_for: gatheringDetail?.gatheringOther?.payment_for || null,
+          payment_amount: gatheringDetail?.gatheringOther?.payment_amount || null,
+          payment_venmo: gatheringDetail?.gatheringOther?.payment_venmo || null,
+          hold_autoreminders: gatheringDetail?.gatheringOther?.hold_autoreminders || false,
+          signup_question: gatheringDetail?.gatheringOther?.signup_question || '',
+          plus_guests: gatheringDetail?.gatheringOther?.plus_guests || 0,
+          potluck: gatheringDetail?.gatheringOther?.potluck || false,
+        }}
+        onSave={handleSettingsSave}
+        onPotluckContribution={handlePotluckContribution}
       />
     </ScrollView>
   );
@@ -450,6 +615,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
   },
+
 
   // Loading and error states
   centerContent: {

@@ -21,11 +21,11 @@ export interface GatheringDisplay {
 export interface GatheringOther {
   id: string;
   gathering: string;
-  cap?: number;
-  payment_amount?: number;
-  payment_for?: string;
+  cap?: number | null;
+  payment_amount?: number | null;
+  payment_for?: string | null;
   payment_to_member?: boolean;
-  payment_venmo?: string;
+  payment_venmo?: string | null;
   potluck?: boolean;
   recruitment?: boolean;
   signup_question?: string;
@@ -34,6 +34,8 @@ export interface GatheringOther {
   description_tbd?: boolean;
   host_message?: string;
   host_subject?: string;
+  hold_autoreminders?: boolean;
+  plus_guests?: number;
 }
 
 export interface MentorInfo {

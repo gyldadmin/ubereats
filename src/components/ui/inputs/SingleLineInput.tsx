@@ -70,7 +70,6 @@ const SingleLineInput = (props: SingleLineInputProps) => {
           styles.input,
           {
             backgroundColor: props.backgroundColor || theme.colors.background.secondary,
-            minHeight: 60,
           },
           props.contentStyle
         ]}

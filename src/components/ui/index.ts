@@ -30,10 +30,11 @@ export { default as NativeDateTimePicker } from './NativeDateTimePicker';
 export { default as EventDateTimePicker } from './EventDateTimePicker';
 
 // Setup item sliders
-export { TitleAndHostsSlider } from './TitleAndHostsSlider';
-export { DateTimeSlider } from './DateTimeSlider';
-export { LocationSlider } from './LocationSlider';
-export { MentorSlider } from './MentorSlider';
-export { DescriptionSlider } from './DescriptionSlider';
+export * from './TitleAndHostsSlider';
+export * from './DateTimeSlider';
+export * from './LocationSlider';
+export * from './MentorSlider';
+export * from './DescriptionSlider';
 export { GatheringTypeSlider } from './GatheringTypeSlider';
+export { SettingsSlider } from './SettingsSlider';
 export { ImageUpload } from './ImageUpload'; 
