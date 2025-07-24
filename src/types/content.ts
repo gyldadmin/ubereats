@@ -4,7 +4,7 @@ export interface ContentTemplate {
   created_at: string;
   updated_at: string;
   content_key: string;
-  content_type: 'email' | 'push' | 'sms' | 'display';
+  content_type: string; // UUID referencing workflow_type table
   usage_context: string | null;
   dynamic_variables: DynamicVariable[];
   primary_text: string | null;

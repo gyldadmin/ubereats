@@ -3,7 +3,8 @@ import { getProcessedContentTemplate } from '../services/contentTemplateService'
 import type { ProcessedContentTemplate, ContentTemplateVariableData } from '../types/content';
 
 export function useContentTemplate(
-  contentKey: string, 
+  contentKey: string,
+  contentType: 'email' | 'push' | 'sms' | 'display',
   variableData: ContentTemplateVariableData
 ) {
   const [contentTemplate, setContentTemplate] = useState<ProcessedContentTemplate | null>(null);
@@ -17,7 +18,7 @@ export function useContentTemplate(
         setError(null);
         
         // Fetch and process the content template
-        const template = await getProcessedContentTemplate(contentKey, variableData);
+        const template = await getProcessedContentTemplate(contentKey, contentType, variableData);
         
         if (template) {
           setContentTemplate(template);
@@ -33,10 +34,10 @@ export function useContentTemplate(
     }
 
     // Only fetch if contentKey is provided
-    if (contentKey) {
+    if (contentKey && contentType) {
       fetchTemplate();
     }
-  }, [contentKey, JSON.stringify(variableData)]);
+  }, [contentKey, contentType, JSON.stringify(variableData)]);
 
   return {
     contentTemplate,

@@ -6,16 +6,31 @@ import type {
 } from '../types/content';
 
 /**
- * Fetches a content template by content_key
+ * Fetches a content template by content_key and optionally content_type
  */
-export async function fetchContentTemplate(contentKey: string): Promise<ContentTemplate | null> {
+export async function fetchContentTemplate(
+  contentKey: string, 
+  contentType?: 'email' | 'push' | 'sms' | 'display'
+): Promise<ContentTemplate | null> {
   try {
-    // Query the content_templates table by content_key
-    const { data, error } = await supabase
+    let query = supabase
       .from('content_templates')
       .select('*')
-      .eq('content_key', contentKey)
-      .single();
+      .eq('content_key', contentKey);
+
+    // If content_type is specified, join with workflow_type to filter
+    if (contentType) {
+      query = supabase
+        .from('content_templates')
+        .select(`
+          *,
+          workflow_type!inner(label)
+        `)
+        .eq('content_key', contentKey)
+        .eq('workflow_type.label', contentType);
+    }
+
+    const { data, error } = await query.single();
 
     if (error) {
       console.error('Error fetching content template:', error);
@@ -55,14 +70,15 @@ export function processTemplateVariables(
  */
 export async function getProcessedContentTemplate(
   contentKey: string,
+  contentType: 'email' | 'push' | 'sms' | 'display',
   variableData: ContentTemplateVariableData
 ): Promise<ProcessedContentTemplate | null> {
   try {
     // Fetch the template from database
-    const template = await fetchContentTemplate(contentKey);
+    const template = await fetchContentTemplate(contentKey, contentType);
     
     if (!template) {
-      console.error(`Content template with key '${contentKey}' not found`);
+      console.error(`Content template with key '${contentKey}' and type '${contentType}' not found`);
       return null;
     }
 

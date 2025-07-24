@@ -62,6 +62,7 @@ interface AuthState {
   signOut: () => Promise<void>;
   initialize: () => Promise<void>;
   checkHasLoggedInBefore: () => Promise<void>;
+  createUserProfile: (user: User) => Promise<void>;
 }
 
 const STORAGE_KEY = 'hasLoggedInBefore';
@@ -196,6 +197,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         .single();
 
       if (publicError) {
+        // Check if this is a "no rows returned" error (PGRST116)
+        if (publicError.code === 'PGRST116') {
+          console.log('No user profile found - creating new profile...');
+          // Create a minimal user profile or handle onboarding flow
+          await get().createUserProfile(user);
+          return;
+        }
+        
+        // Log other errors normally
         console.error('Error fetching user public data:', publicError);
         set({ isLoading: false });
         return;
@@ -306,6 +316,65 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch (error) {
       console.error('Error initializing auth:', error);
       set({ isInitialized: true, isLoading: false });
+    }
+  },
+
+  // Create minimal user profile for new users
+  createUserProfile: async (user: User) => {
+    console.log('Creating user profile for:', user.id);
+    
+    try {
+      // Extract name from email or use default
+      const email = user.email || '';
+      const namePart = email.split('@')[0];
+      const displayName = namePart.charAt(0).toUpperCase() + namePart.slice(1);
+      
+      // Create minimal users_public record
+      const { data: userPublic, error: publicError } = await supabase
+        .from('users_public')
+        .insert({
+          user_id: user.id,
+          first: displayName,
+          full_name: displayName,
+          // Leave gyld null - user will need to be assigned to a gyld
+        })
+        .select()
+        .single();
+
+      if (publicError) {
+        console.error('Error creating user public profile:', publicError);
+        set({ isLoading: false });
+        return;
+      }
+
+      // Create minimal users_private record for onboarding tracking
+      const { error: privateError } = await supabase
+        .from('users_private')
+        .insert({
+          user_id: user.id,
+          onboard_status: 0, // User needs to complete onboarding
+        });
+
+      if (privateError) {
+        console.error('Error creating user private profile:', privateError);
+        // Continue - private profile is optional
+      }
+
+      console.log('User profile created successfully');
+      
+      // Set the created profile data
+      set({
+        userName: displayName,
+        userGyld: null, // User needs gyld assignment
+        isOrganizer: false,
+        userPublic,
+        userInternal: null,
+        isLoading: false,
+      });
+
+    } catch (error) {
+      console.error('Error in createUserProfile:', error);
+      set({ isLoading: false });
     }
   },
 })); 

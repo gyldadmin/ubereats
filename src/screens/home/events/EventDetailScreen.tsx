@@ -146,6 +146,7 @@ export default function EventDetailScreen() {
     error: templateError
   } = useContentTemplate(
     'mentoring_how_it_works',
+    'display',
     {
       'gyld_type_@': userGyldTypeSymbol || 'mentoring'
     }
@@ -156,7 +157,7 @@ export default function EventDetailScreen() {
     contentTemplate: scribeRoleTemplate,
     loading: scribeTemplateLoading,
     error: scribeTemplateError
-  } = useContentTemplate('mentoring_scribe_role', {});
+  } = useContentTemplate('mentoring_scribe_role', 'display', {});
 
   // Fetch potluck data when gathering detail is available
   React.useEffect(() => {
