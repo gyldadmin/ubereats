@@ -77,36 +77,10 @@ export async function createUnsavedGathering(
 
     const gatheringId = gatheringResult.id;
 
-    // Create gathering_displays satellite record
-    const { error: displayError } = await supabase
-      .from('gathering_displays')
-      .insert({
-        gathering_id: gatheringId  // gathering_displays uses 'gathering_id'
-      });
+    // The database trigger create_gathering_satellites() will automatically create 
+    // both gathering_displays and gathering_other records, so we don't need to do it manually
 
-    if (displayError) {
-      console.error('Error creating gathering_displays record:', displayError);
-      // Clean up the gathering record if satellite creation fails
-      await supabase.from('gatherings').delete().eq('id', gatheringId);
-      return { data: null, error: displayError };
-    }
-
-    // Create gathering_other satellite record
-    const { error: otherError } = await supabase
-      .from('gathering_other')
-      .insert({
-        gathering: gatheringId  // gathering_other uses 'gathering' (not 'gathering_id')
-      });
-
-    if (otherError) {
-      console.error('Error creating gathering_other record:', otherError);
-      // Clean up both gathering and gathering_displays if this fails
-      await supabase.from('gathering_displays').delete().eq('gathering_id', gatheringId);
-      await supabase.from('gatherings').delete().eq('id', gatheringId);
-      return { data: null, error: otherError };
-    }
-
-    console.log('✅ Created unsaved gathering with satellites:', gatheringId);
+    console.log('✅ Created unsaved gathering (satellites created by trigger):', gatheringId);
     return { data: { gathering_id: gatheringId }, error: null };
 
   } catch (error) {
@@ -277,10 +251,11 @@ export async function fetchActiveMentors(
     const conditions = [`gyld.cs.{${userGyld}}`];
     
     // Only add array overlap conditions if we have the arrays
-    if (gyldMetro && gyldMetro.length > 0 && gyldType && gyldType.length > 0) {
-      // For array overlap, we need to check if mentor's arrays overlap with gyld's arrays
-      const metroOverlap = `metro.ov.{${gyldMetro.join(',')}}`;
-      const typeOverlap = `gyld_type.ov.{${gyldType.join(',')}}`;
+    const metroArr = Array.isArray(gyldMetro) ? gyldMetro : gyldMetro ? [gyldMetro] : [];
+    const typeArr = Array.isArray(gyldType) ? gyldType : gyldType ? [gyldType] : [];
+    if (metroArr.length > 0 && typeArr.length > 0) {
+      const metroOverlap = `metro.ov.{${metroArr.join(',')}}`;
+      const typeOverlap = `gyld_type.ov.{${typeArr.join(',')}}`;
       conditions.push(`and(${metroOverlap},${typeOverlap})`);
     }
     
@@ -385,7 +360,7 @@ export async function fetchPlannedWorkflows(
       .from('planned_workflows')
       .select(`
         *,
-        planned_workflow_type:planned_workflow_types(label)
+        planned_workflow_type:workflow_type(label)
       `)
       .eq('gathering_id', gatheringId)
       .order('created_at', { ascending: true });

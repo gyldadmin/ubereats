@@ -1,5 +1,5 @@
 import React from 'react';
-import { EventDateTimePicker as BaseEventDateTimePicker } from '../ui';
+import BaseEventDateTimePicker from '../ui/EventDateTimePicker';
 
 interface EventDateTimePickerProps {
   label: string;

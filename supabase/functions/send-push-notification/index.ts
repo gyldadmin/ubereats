@@ -7,6 +7,9 @@ interface PushNotificationRequest {
   subtitle?: string;
   body: string;
   data?: Record<string, any>;
+  richContent?: {
+    image?: string;
+  };
 }
 
 interface PushNotificationResponse {
@@ -103,7 +106,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
       body: requestData.body,
       data: requestData.data || {},
       sound: 'default',
-      priority: 'high' as const
+      priority: 'high' as const,
+      // Add rich content with image if provided
+      ...(requestData.richContent?.image && {
+        richContent: {
+          image: requestData.richContent.image
+        }
+      })
     }));
 
     console.log('Sending push notifications', { messageCount: messages.length });

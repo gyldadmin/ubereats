@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import Constants from 'expo-constants';
+import { getProcessedContentTemplate } from './contentTemplateService';
 import { 
   EmailServiceInputs, 
   EmailServiceResponse, 
@@ -10,7 +11,10 @@ import {
   SendGridPayload,
   SendGridPersonalization,
   ScheduledEmailRecord,
-  NotificationSentRecord
+  NotificationSentRecord,
+  UserEmailInfo,
+  GatheringDynamicData,
+  DynamicContentData
 } from '../types/email';
 
 export class EmailService {
@@ -31,7 +35,9 @@ export class EmailService {
       console.log('EmailService: Processing email request', {
         template: inputs.template_name,
         email_type: inputs.email_type,
-        recipients: inputs.to_address.length,
+        recipients: inputs.to_address?.length || 'dynamic',
+        has_recipient_source: !!inputs.recipient_source,
+        has_content_source: !!inputs.content_source,
         scheduled_for: inputs.send_date
       });
 
@@ -44,15 +50,17 @@ export class EmailService {
       const isImmediate = sendDate <= now;
 
       if (isImmediate) {
-        // Send immediately
-        const emailId = await this.sendImmediately(inputs);
+        // Resolve dynamic inputs before sending immediately
+        const resolvedInputs = await this.resolveDynamicInputs(inputs);
+        const emailId = await this.sendImmediately(resolvedInputs);
         return {
           success: true,
           message: 'Email sent successfully',
           emailId
         };
       } else {
-        // Schedule for future delivery
+        // For scheduled emails, store the dynamic inputs in workflow_data
+        // They will be resolved at send time by executeScheduledEmail
         const workflowId = await this.scheduleEmail(inputs);
         return {
           success: true,
@@ -230,12 +238,17 @@ export class EmailService {
           template_name: inputs.template_name,
           email_type: inputs.email_type,
           subject: inputs.subject,
-          to_address: inputs.to_address
+          to_address: inputs.to_address?.length || 'dynamic',
+          has_recipient_source: !!inputs.recipient_source,
+          has_content_source: !!inputs.content_source
         }
       });
 
-      // Send the email
-      await this.sendImmediately(inputs);
+      // Resolve dynamic inputs before sending (fresh data at send time!)
+      const resolvedInputs = await this.resolveDynamicInputs(inputs);
+      
+      // Send the email with resolved inputs
+      await this.sendImmediately(resolvedInputs);
 
       // Update workflow status to completed
       const completedStatus = await this.lookupStatusOption('completed');
@@ -783,27 +796,335 @@ export class EmailService {
     return 'workflow_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
   }
 
+  /**
+   * Dynamic input resolution
+   */
+  
+  // Resolve dynamic inputs to static inputs compatible with existing code
+  private async resolveDynamicInputs(inputs: EmailServiceInputs): Promise<EmailServiceInputs> {
+    console.log('EmailService: Resolving dynamic inputs');
+    
+    const resolvedInputs = { ...inputs };
+    
+    // Resolve recipients if using dynamic source
+    if (inputs.recipient_source) {
+      console.log('EmailService: Resolving dynamic recipients');
+      resolvedInputs.to_address = await this.fetchRecipients(inputs.recipient_source);
+      
+      // Clear the recipient_source since we now have resolved emails
+      delete resolvedInputs.recipient_source;
+    }
+    
+    // Resolve content if using dynamic source
+    if (inputs.content_source) {
+      console.log('EmailService: Resolving dynamic content');
+      const contentData = await this.fetchContentData(inputs.content_source);
+      const processedContent = await this.renderDynamicContent(inputs.content_source, contentData);
+      
+      // Update resolved inputs with rendered content
+      resolvedInputs.subject = processedContent.subject;
+      resolvedInputs.body1 = processedContent.body1;
+      resolvedInputs.body2 = processedContent.body2;
+      
+      // Add personalization if available
+      if (contentData.user?.first_name) {
+        resolvedInputs.first = contentData.user.first_name;
+      }
+      
+      if (contentData.gathering) {
+        resolvedInputs.gath_title = contentData.gathering.title;
+        resolvedInputs.gath_date = contentData.gathering.date_time;
+      }
+      
+      // Clear the content_source since we now have resolved content
+      delete resolvedInputs.content_source;
+    }
+    
+    console.log('EmailService: Dynamic inputs resolved', {
+      recipients: resolvedInputs.to_address?.length,
+      subject: resolvedInputs.subject?.substring(0, 50) + '...'
+    });
+    
+    return resolvedInputs;
+  }
+  
+  // Render dynamic content using content templates
+  private async renderDynamicContent(
+    contentSource: NonNullable<EmailServiceInputs['content_source']>, 
+    contentData: DynamicContentData
+  ): Promise<{ subject: string; body1: string; body2?: string }> {
+    try {
+      // Build template variables from dynamic data
+      const templateVariables: Record<string, string | number | null> = {};
+      
+      if (contentData.gathering) {
+        templateVariables.gathering_title = contentData.gathering.title;
+        templateVariables.gathering_date = contentData.gathering.date_time || '';
+        templateVariables.gathering_location = contentData.gathering.location || '';
+        templateVariables.attendee_count = contentData.gathering.attendee_count || 0;
+      }
+      
+      if (contentData.user) {
+        templateVariables.first_name = contentData.user.first_name || '';
+        templateVariables.user_email = contentData.user.email;
+      }
+      
+      if (contentData.candidate) {
+        templateVariables.candidate_name = contentData.candidate.first_name || '';
+        templateVariables.candidate_status = contentData.candidate.status || '';
+      }
+      
+      // Fetch and process the content template
+      const processedTemplate = await getProcessedContentTemplate(
+        contentSource.template_key,
+        'email',
+        templateVariables
+      );
+      
+      if (!processedTemplate) {
+        throw new Error(`Content template '${contentSource.template_key}' not found or failed to process`);
+      }
+      
+      return {
+        subject: processedTemplate.processed_primary_text || 'Email Subject',
+        body1: processedTemplate.processed_secondary_text || 'Email Body',
+        body2: processedTemplate.processed_tertiary_text
+      };
+      
+    } catch (error) {
+      console.error('EmailService: Error rendering dynamic content', error);
+      throw new Error(`Failed to render dynamic content: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Dynamic data fetching methods
+   */
+  
+  // Fetch recipients based on dynamic source
+  private async fetchRecipients(recipientSource: NonNullable<EmailServiceInputs['recipient_source']>): Promise<string[]> {
+    console.log('EmailService: Fetching dynamic recipients', { type: recipientSource.type });
+    
+    try {
+      switch (recipientSource.type) {
+        case 'rsvp_list':
+          return await this.fetchRSVPRecipients(recipientSource.gathering_id!, recipientSource.rsvp_status || 'yes');
+          
+        case 'user_ids':
+          return await this.fetchUserEmailsByIds(recipientSource.user_ids!);
+          
+        case 'gyld_members':
+          return await this.fetchGyldMemberEmails(recipientSource.gyld_id!);
+          
+        case 'static_emails':
+          return recipientSource.static_emails!;
+          
+        default:
+          throw new Error(`Unknown recipient source type: ${(recipientSource as any).type}`);
+      }
+    } catch (error) {
+      console.error('EmailService: Error fetching dynamic recipients', error);
+      throw new Error(`Failed to fetch recipients: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+  
+  // Fetch RSVP list for gathering
+  private async fetchRSVPRecipients(gatheringId: string, rsvpStatus: string): Promise<string[]> {
+    console.log('EmailService: Fetching RSVP recipients', { gatheringId, rsvpStatus });
+    
+    const { data, error } = await supabase
+      .from('participation_gatherings')
+      .select(`
+        users_private!inner(email)
+      `)
+      .eq('gathering_id', gatheringId)
+      .eq('part_gath_status.label', rsvpStatus);
+    
+    if (error) {
+      throw new Error(`Failed to fetch RSVP recipients: ${error.message}`);
+    }
+    
+    return (data || []).map((item: any) => item.users_private.email).filter(Boolean);
+  }
+  
+  // Fetch user emails by user IDs
+  private async fetchUserEmailsByIds(userIds: string[]): Promise<string[]> {
+    console.log('EmailService: Fetching user emails by IDs', { count: userIds.length });
+    
+    const { data, error } = await supabase
+      .from('users_private')
+      .select('email')
+      .in('user_id', userIds);
+    
+    if (error) {
+      throw new Error(`Failed to fetch user emails: ${error.message}`);
+    }
+    
+    return (data || []).map(item => item.email).filter(Boolean);
+  }
+  
+  // Fetch gyld member emails
+  private async fetchGyldMemberEmails(gyldId: string): Promise<string[]> {
+    console.log('EmailService: Fetching gyld member emails', { gyldId });
+    
+    const { data, error } = await supabase
+      .from('gyld')
+      .select(`
+        users_private!inner(email)
+      `)
+      .eq('id', gyldId);
+    
+    if (error) {
+      throw new Error(`Failed to fetch gyld member emails: ${error.message}`);
+    }
+    
+    return (data || []).map((item: any) => item.users_private.email).filter(Boolean);
+  }
+  
+  // Fetch dynamic content data and render templates
+  private async fetchContentData(contentSource: NonNullable<EmailServiceInputs['content_source']>): Promise<DynamicContentData> {
+    console.log('EmailService: Fetching dynamic content data', { sources: contentSource.dynamic_data_sources });
+    
+    const dynamicData: DynamicContentData = {};
+    
+    try {
+      // Fetch gathering data if requested
+      if (contentSource.dynamic_data_sources.gathering_id) {
+        dynamicData.gathering = await this.fetchGatheringData(contentSource.dynamic_data_sources.gathering_id);
+      }
+      
+      // Fetch user data if requested
+      if (contentSource.dynamic_data_sources.user_id) {
+        dynamicData.user = await this.fetchUserData(contentSource.dynamic_data_sources.user_id);
+      }
+      
+      // Fetch candidate data if requested
+      if (contentSource.dynamic_data_sources.candidate_id) {
+        dynamicData.candidate = await this.fetchCandidateData(contentSource.dynamic_data_sources.candidate_id);
+      }
+      
+      return dynamicData;
+    } catch (error) {
+      console.error('EmailService: Error fetching dynamic content data', error);
+      throw new Error(`Failed to fetch content data: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+  
+  // Fetch gathering data
+  private async fetchGatheringData(gatheringId: string): Promise<GatheringDynamicData> {
+    const { data, error } = await supabase
+      .from('gatherings')
+      .select(`
+        id, 
+        title,
+        description,
+        date_time,
+        gathering_displays!inner(location),
+        participation_gatherings(id)
+      `)
+      .eq('id', gatheringId)
+      .single();
+    
+    if (error) {
+      throw new Error(`Failed to fetch gathering data: ${error.message}`);
+    }
+    
+    return {
+      id: data.id,
+      title: data.title,
+      description: data.description,
+      date_time: data.date_time,
+      location: (data.gathering_displays as any)?.location,
+      attendee_count: (data.participation_gatherings || []).length
+    };
+  }
+  
+  // Fetch user data
+  private async fetchUserData(userId: string): Promise<DynamicContentData['user']> {
+    const { data, error } = await supabase
+      .from('users_private')
+      .select('user_id, email, first_name')
+      .eq('user_id', userId)
+      .single();
+    
+    if (error) {
+      throw new Error(`Failed to fetch user data: ${error.message}`);
+    }
+    
+    return {
+      id: data.user_id,
+      first_name: data.first_name,
+      email: data.email
+    };
+  }
+  
+  // Fetch candidate data
+  private async fetchCandidateData(candidateId: string): Promise<DynamicContentData['candidate']> {
+    const { data, error } = await supabase
+      .from('candidates')
+      .select('id, first_name, status')
+      .eq('id', candidateId)
+      .single();
+    
+    if (error) {
+      throw new Error(`Failed to fetch candidate data: ${error.message}`);
+    }
+    
+    return {
+      id: data.id,
+      first_name: data.first_name,
+      status: data.status
+    };
+  }
+
   private validateInputs(inputs: EmailServiceInputs): void {
     // Required field validation
     if (!inputs.template_name) throw new Error('template_name is required');
     if (!inputs.email_type) throw new Error('email_type is required');
     if (!inputs.sender_fullname) throw new Error('sender_fullname is required');
-    if (!inputs.subject) throw new Error('subject is required');
-    if (!inputs.body1) throw new Error('body1 is required');
-    if (!inputs.to_address || inputs.to_address.length === 0) throw new Error('to_address is required and must not be empty');
     if (!inputs.send_date) throw new Error('send_date is required');
     if (!inputs.initiated_by) throw new Error('initiated_by is required');
+    
+    // Recipient validation - must have either static recipients OR dynamic source
+    if (!inputs.to_address && !inputs.recipient_source) {
+      throw new Error('Either to_address or recipient_source is required');
+    }
+    
+    if (inputs.to_address && inputs.to_address.length === 0) {
+      throw new Error('to_address must contain at least one email when provided');
+    }
+    
+    // Content validation - must have either static content OR dynamic source
+    if (!inputs.subject && !inputs.content_source) {
+      throw new Error('Either subject or content_source is required');
+    }
+    
+    if (!inputs.body1 && !inputs.content_source) {
+      throw new Error('Either body1 or content_source is required');
+    }
+    
+    // Validate dynamic sources if provided
+    if (inputs.recipient_source) {
+      this.validateRecipientSource(inputs.recipient_source);
+    }
+    
+    if (inputs.content_source) {
+      this.validateContentSource(inputs.content_source);
+    }
 
-    // Email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    inputs.to_address.forEach(email => {
-      if (!emailRegex.test(email)) {
-        throw new Error(`Invalid email address: ${email}`);
-      }
-    });
+    // Email validation for static recipients
+    if (inputs.to_address) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      inputs.to_address.forEach(email => {
+        if (!emailRegex.test(email)) {
+          throw new Error(`Invalid email address: ${email}`);
+        }
+      });
+    }
 
     // Optional email validation
     if (inputs.cc_address) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       inputs.cc_address.forEach(email => {
         if (!emailRegex.test(email)) {
           throw new Error(`Invalid CC email address: ${email}`);
@@ -812,6 +1133,7 @@ export class EmailService {
     }
 
     if (inputs.bcc_address) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       inputs.bcc_address.forEach(email => {
         if (!emailRegex.test(email)) {
           throw new Error(`Invalid BCC email address: ${email}`);
@@ -819,8 +1141,70 @@ export class EmailService {
       });
     }
 
-    if (inputs.reply_to_address && !emailRegex.test(inputs.reply_to_address)) {
-      throw new Error(`Invalid reply-to email address: ${inputs.reply_to_address}`);
+    if (inputs.reply_to_address) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(inputs.reply_to_address)) {
+        throw new Error(`Invalid reply-to email address: ${inputs.reply_to_address}`);
+      }
+    }
+  }
+
+  // Validate recipient source configuration
+  private validateRecipientSource(recipientSource: NonNullable<EmailServiceInputs['recipient_source']>): void {
+    switch (recipientSource.type) {
+      case 'rsvp_list':
+        if (!recipientSource.gathering_id) {
+          throw new Error('gathering_id is required for rsvp_list recipient source');
+        }
+        break;
+        
+      case 'user_ids':
+        if (!recipientSource.user_ids || recipientSource.user_ids.length === 0) {
+          throw new Error('user_ids array is required and must not be empty for user_ids recipient source');
+        }
+        break;
+        
+      case 'gyld_members':
+        if (!recipientSource.gyld_id) {
+          throw new Error('gyld_id is required for gyld_members recipient source');
+        }
+        break;
+        
+      case 'static_emails':
+        if (!recipientSource.static_emails || recipientSource.static_emails.length === 0) {
+          throw new Error('static_emails array is required and must not be empty for static_emails recipient source');
+        }
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        recipientSource.static_emails.forEach(email => {
+          if (!emailRegex.test(email)) {
+            throw new Error(`Invalid email address in static_emails: ${email}`);
+          }
+        });
+        break;
+        
+      default:
+        throw new Error(`Unknown recipient source type: ${(recipientSource as any).type}`);
+    }
+  }
+
+  // Validate content source configuration
+  private validateContentSource(contentSource: NonNullable<EmailServiceInputs['content_source']>): void {
+    if (!contentSource.template_key) {
+      throw new Error('template_key is required for content_source');
+    }
+    
+    if (!contentSource.dynamic_data_sources) {
+      throw new Error('dynamic_data_sources is required for content_source');
+    }
+    
+    // At least one data source must be specified
+    const hasDataSource = contentSource.dynamic_data_sources.gathering_id || 
+                         contentSource.dynamic_data_sources.user_id || 
+                         contentSource.dynamic_data_sources.candidate_id;
+    
+    if (!hasDataSource) {
+      throw new Error('At least one dynamic_data_source must be specified (gathering_id, user_id, or candidate_id)');
     }
   }
 }

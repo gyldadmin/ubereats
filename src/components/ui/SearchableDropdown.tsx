@@ -262,7 +262,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   placeholderText: {
-    fontStyle: 'italic',
+    // Removed italic style for placeholder text
   },
   chevron: {
     marginLeft: 8,

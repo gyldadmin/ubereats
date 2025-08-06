@@ -62,7 +62,7 @@ export const useLearningTopics = () => {
       const { data: learningTopicsData, error: learningTopicsError } = await supabase
         .from('learning_topic')
         .select('*')
-        .overlaps('gyld_type', gyldData.gyld_type)
+        .overlaps('gyld_type', Array.isArray(gyldData.gyld_type) ? gyldData.gyld_type : [gyldData.gyld_type])
         .order('label', { ascending: true });
 
       if (learningTopicsError) {

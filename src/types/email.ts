@@ -15,10 +15,20 @@ export interface EmailServiceInputs {
   gath_date?: string; // Gathering date
   gath_title?: string; // Gathering title
   
-  // Recipients
-  to_address: string[];
+  // Recipients (static - current approach)
+  to_address?: string[]; // Made optional to support dynamic recipients
   cc_address?: string[]; // Optional
   bcc_address?: string[]; // Optional
+  
+  // Dynamic recipient sources (new approach)
+  recipient_source?: {
+    type: 'rsvp_list' | 'user_ids' | 'gyld_members' | 'static_emails';
+    gathering_id?: string; // For rsvp_list
+    rsvp_status?: 'yes' | 'no' | 'maybe'; // For rsvp_list  
+    user_ids?: string[]; // For user_ids type
+    static_emails?: string[]; // For static_emails type
+    gyld_id?: string; // For gyld_members type
+  };
   
   // Reply handling
   reply_to_address?: string; // Optional
@@ -32,6 +42,16 @@ export interface EmailServiceInputs {
   buttontext?: string; // Optional
   buttonurl?: string; // URL, optional
   unsubscribeurl?: string; // URL, optional
+  
+  // Dynamic content sources (new approach)
+  content_source?: {
+    template_key: string; // Content template key for dynamic rendering
+    dynamic_data_sources: {
+      gathering_id?: string; // Fetch fresh gathering details
+      user_id?: string; // Fetch fresh user details  
+      candidate_id?: string; // Fetch fresh candidate details
+    };
+  };
   
   // Scheduling
   send_date: Date;
@@ -123,4 +143,35 @@ export interface NotificationSentRecord {
   subject: string;
   send_date: Date;
   status?: 'sent' | 'failed'; // Delivery status (defaults to 'sent')
-} 
+}
+
+// New types for dynamic data fetching
+export interface UserEmailInfo {
+  user_id: string;
+  email: string;
+  first_name?: string;
+  last_name?: string;
+}
+
+export interface GatheringDynamicData {
+  id: string;
+  title: string;
+  description?: string;
+  date_time?: string;
+  location?: string;
+  attendee_count?: number;
+}
+
+export interface DynamicContentData {
+  gathering?: GatheringDynamicData;
+  user?: {
+    id: string;
+    first_name?: string;
+    email: string;
+  };
+  candidate?: {
+    id: string;
+    first_name?: string;
+    status?: string;
+  };
+}

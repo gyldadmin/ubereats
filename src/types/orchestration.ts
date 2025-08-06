@@ -11,19 +11,38 @@ export interface OrchestrationInputs {
   // Mode selection
   mode: OrchestrationMode; // 'push_preferred' or 'both'
   
-  // Unified recipient data
-  users: string[]; // Array of user IDs
+  // Recipients (static - current approach)
+  users?: string[]; // Array of user IDs - made optional for dynamic support
   send_date: Date; // When to send
   
-  // Unified content (used for both push and email)
-  title: string; // Main title/subject
+  // Dynamic recipient sources (new approach)
+  recipient_source?: {
+    type: 'rsvp_list' | 'user_ids' | 'gyld_members';
+    gathering_id?: string; // For rsvp_list
+    rsvp_status?: 'yes' | 'no' | 'maybe'; // For rsvp_list  
+    user_ids?: string[]; // For user_ids type
+    gyld_id?: string; // For gyld_members type
+  };
+  
+  // Unified content (static - current approach)
+  title?: string; // Main title/subject - made optional for dynamic support
   subtitle?: string; // Secondary title
-  content: string; // Main body content
+  content?: string; // Main body content - made optional for dynamic support
   secondary_content?: string; // Additional body content for email
   
-  // Content template integration (same content_key, different content_type)
+  // Content template integration (legacy approach)
   content_key?: string; // Reference to content_templates table
   template_variables?: Record<string, string | number | null>; // Variables for template processing
+  
+  // Dynamic content sources (new approach)
+  content_source?: {
+    template_key: string; // Content template key for dynamic rendering
+    dynamic_data_sources: {
+      gathering_id?: string; // Fetch fresh gathering details
+      user_id?: string; // Fetch fresh user details  
+      candidate_id?: string; // Fetch fresh candidate details
+    };
+  };
   
   // Deep linking and buttons
   deep_link?: string; // Format: "ScreenName?param1=value1&param2=value2"

@@ -42,6 +42,7 @@ export const TitleAndHostsSlider: React.FC<TitleAndHostsSliderProps> = ({
   const [userHasPressedAddHosts, setUserHasPressedAddHosts] = useState(false);
   const [userHasPressedAddImage, setUserHasPressedAddImage] = useState(false);
   const [showSaveChangesPopup, setShowSaveChangesPopup] = useState(false);
+  // Removed showSaveChangesPopup state - now handled by parent
 
   // Get gyld members for dropdowns
   const { members: gyldMembers, loading: membersLoading, error: membersError } = useGyldMembers();
@@ -77,12 +78,15 @@ export const TitleAndHostsSlider: React.FC<TitleAndHostsSliderProps> = ({
     setShowImage(shouldShowImage);
   }, [shouldShowHosts, shouldShowImage]);
 
-  // Check if there are unsaved changes
-  const hasUnsavedChanges = 
-    title !== (initialData?.title || '') ||
-    scribe !== (initialData?.scribe || '') ||
-    JSON.stringify(hosts.sort()) !== JSON.stringify((initialData?.hosts || []).sort()) ||
-    image !== (initialData?.image || null);
+  // Check if there are unsaved changes (memoized to prevent unnecessary re-renders)
+  const hasUnsavedChanges = React.useMemo(() => {
+    const titleChanged = title.trim() !== (initialData?.title || '').trim();
+    const scribeChanged = scribe !== (initialData?.scribe || '');
+    const hostsChanged = JSON.stringify([...hosts].sort()) !== JSON.stringify([...(initialData?.hosts || [])].sort());
+    const imageChanged = image !== (initialData?.image || null);
+    
+    return titleChanged || scribeChanged || hostsChanged || imageChanged;
+  }, [title, scribe, hosts, image, initialData]);
 
   // No validation required - save button only checks for changes
 
@@ -118,14 +122,16 @@ export const TitleAndHostsSlider: React.FC<TitleAndHostsSliderProps> = ({
 
   const handleClose = () => {
     console.log('🚪 TitleAndHostsSlider handleClose called');
+    console.log('📊 hasUnsavedChanges:', hasUnsavedChanges);
     if (hasUnsavedChanges) {
+      console.log('🛑 Unsaved changes detected - showing confirmation overlay');
       setShowSaveChangesPopup(true);
     } else {
       onClose();
     }
   };
 
-  // Handle save changes popup responses
+  // Confirmation overlay handlers
   const handleSaveChanges = async () => {
     await handleSave();
     setShowSaveChangesPopup(false);
@@ -323,45 +329,28 @@ export const TitleAndHostsSlider: React.FC<TitleAndHostsSliderProps> = ({
             </Text>
           </TouchableOpacity>
         </View>
+
+        {/* Confirmation Overlay */}
+        {showSaveChangesPopup && (
+          <View style={styles.popupOverlay} pointerEvents="auto">
+            <View style={styles.popupContainer}>
+              <Text style={styles.popupTitle}>Save changes?</Text>
+              <Text style={styles.popupMessage}>You have unsaved changes that will be lost if you discard.</Text>
+              <View style={styles.popupButtons}>
+                <TouchableOpacity style={styles.popupNoButton} onPress={handleDiscardChanges}>
+                  <Text style={styles.popupNoButtonText}>Discard</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.popupYesButton} onPress={handleSaveChanges}>
+                  <Text style={styles.popupYesButtonText}>Save</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        )}
       </View>
     </Modal>
 
-    {/* Save Changes Popup */}
-    <Modal
-      visible={showSaveChangesPopup}
-      transparent={true}
-      animationType="fade"
-      onRequestClose={() => setShowSaveChangesPopup(false)}
-    >
-      <TouchableOpacity 
-        style={styles.popupOverlay} 
-        activeOpacity={1} 
-        onPress={() => setShowSaveChangesPopup(false)}
-      >
-        <View style={styles.popupContainer}>
-          <Text style={styles.popupTitle}>Save Changes to Title and Hosts?</Text>
-          <Text style={styles.popupMessage}>
-            You have unsaved changes that will be lost if you continue.
-          </Text>
-          
-          <View style={styles.popupButtons}>
-            <TouchableOpacity 
-              style={styles.popupNoButton}
-              onPress={handleDiscardChanges}
-            >
-              <Text style={styles.popupNoButtonText}>No</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.popupYesButton}
-              onPress={handleSaveChanges}
-            >
-              <Text style={styles.popupYesButtonText}>Yes</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-             </TouchableOpacity>
-     </Modal>
+    {/* Save Changes Popup removed - now handled by parent component */}
    </>
  );
 };
@@ -490,64 +479,79 @@ const styles = StyleSheet.create({
   saveButtonTextInactive: {
     color: theme.colors.text.secondary,
   },
-
-  // Save Changes Popup Styles
+  // Confirmation Overlay styles
   popupOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 1000,
   },
   popupContainer: {
-    backgroundColor: theme.colors.background.secondary,
-    borderRadius: 12,
+    backgroundColor: theme.colors.background.primary,
+    borderRadius: theme.spacing.md,
     padding: theme.spacing.lg,
-    margin: theme.spacing.lg,
-    width: 320,
-    elevation: 8,
-    justifyContent: 'space-between',
+    width: '80%',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
   },
   popupTitle: {
     fontSize: theme.typography.sizes.lg,
-    fontWeight: theme.typography.weights.semibold,
+    fontWeight: theme.typography.weights.bold,
     color: theme.colors.text.primary,
+    marginBottom: theme.spacing.sm,
     textAlign: 'center',
-    marginBottom: theme.spacing.md,
-    lineHeight: 24,
   },
   popupMessage: {
     fontSize: theme.typography.sizes.md,
     color: theme.colors.text.secondary,
     textAlign: 'center',
-    lineHeight: 20,
     marginBottom: theme.spacing.lg,
   },
   popupButtons: {
     flexDirection: 'row',
-    gap: theme.spacing.md,
+    justifyContent: 'space-around',
+    width: '100%',
   },
   popupNoButton: {
-    flex: 1,
     backgroundColor: theme.colors.background.tertiary,
-    borderRadius: 8,
+    borderRadius: theme.spacing.md,
     paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
+    flex: 1,
+    marginRight: theme.spacing.sm,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   popupNoButtonText: {
     fontSize: theme.typography.sizes.md,
     fontWeight: theme.typography.weights.medium,
     color: theme.colors.text.secondary,
+    textAlign: 'center',
   },
   popupYesButton: {
-    flex: 1,
     backgroundColor: theme.colors.primary,
-    borderRadius: 8,
+    borderRadius: theme.spacing.md,
     paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
+    flex: 1,
+    marginLeft: theme.spacing.sm,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   popupYesButtonText: {
     fontSize: theme.typography.sizes.md,
     fontWeight: theme.typography.weights.semibold,
     color: theme.colors.text.inverse,
+    textAlign: 'center',
   },
 }); 
+// Popup styles removed - now handled by parent component 

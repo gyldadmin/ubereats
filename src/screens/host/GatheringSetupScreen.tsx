@@ -226,6 +226,19 @@ export default function GatheringSetupScreen() {
   const [showDescriptionSlider, setShowDescriptionSlider] = useState(false);
   const [showSettingsSlider, setShowSettingsSlider] = useState(false);
   const [showJustLaunchedPopup, setShowJustLaunchedPopup] = useState(false);
+  
+  // Title and Hosts popup state - moved from component to parent
+  // const [showTitleHostsPopup, setShowTitleHostsPopup] = useState(false);
+  // const [titleHostsSaveCallback, setTitleHostsSaveCallback] = useState<(() => Promise<void>) | null>(null);
+  // const [titleHostsDiscardCallback, setTitleHostsDiscardCallback] = useState<(() => void) | null>(null);
+
+  // Handle unsaved changes from TitleAndHostsSlider
+  // const handleTitleHostsUnsavedChanges = () => {};
+
+  // Handle popup responses
+  // const handleTitleHostsSave = async () => {};
+
+  // const handleTitleHostsDiscard = () => {};
 
   const handleTipsAndFAQs = () => {
     (navigation as any).navigate('GatheringResources');
@@ -852,6 +865,44 @@ export default function GatheringSetupScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Title and Hosts Unsaved Changes Popup */}
+      <Modal
+        visible={false} // Changed to false as per edit hint
+        transparent={true}
+        animationType="fade"
+        presentationStyle="overFullScreen"
+        onRequestClose={() => {}} // No-op as per edit hint
+      >
+        {console.log('🎨 POPUP MODAL RENDERING! visible:', false)}
+        <View
+          style={[styles.popupOverlay, { backgroundColor: 'rgba(255, 0, 0, 0.8)' }]}
+          onLayout={(event) => {
+            console.log('📐 POPUP OVERLAY LAYOUT:', event.nativeEvent.layout);
+          }}
+        >
+          <View
+            style={[styles.popupContainer, { backgroundColor: '#00FF00', borderWidth: 5, borderColor: '#FF0000' }]}
+            onLayout={(event) => {
+              console.log('📐 POPUP CONTAINER LAYOUT:', event.nativeEvent.layout);
+            }}
+          >
+            {console.log('🎨 POPUP CONTAINER RENDERING!')}
+            <Text style={styles.popupTitle}>DIAGNOSTIC: Unsaved Changes - Can you see this?</Text>
+            <Text style={styles.popupMessage}>
+              You have unsaved changes to the Title and Hosts. Would you like to save them?
+            </Text>
+            <View style={styles.popupButtons}>
+              <TouchableOpacity style={styles.popupNoButton} onPress={() => {}}>
+                <Text style={styles.popupNoButtonText}>Discard</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.popupYesButton} onPress={() => {}}>
+                <Text style={styles.popupYesButtonText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -996,6 +1047,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
+    position: 'absolute', // Ensure overlay is on top
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1000,
   },
   popupContainer: {
     backgroundColor: theme.colors.background.secondary,

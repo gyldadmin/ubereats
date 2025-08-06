@@ -347,6 +347,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         return;
       }
 
+      // Create minimal users_internal record
+      const { error: internalError } = await supabase
+        .from('users_internal')
+        .insert({
+          user_id: user.id,
+          user_status: 'active',
+        });
+
+      if (internalError) {
+        console.error('Error creating user internal profile:', internalError);
+        // Continue - internal profile is optional
+      }
+
       // Create minimal users_private record for onboarding tracking
       const { error: privateError } = await supabase
         .from('users_private')

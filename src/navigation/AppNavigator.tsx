@@ -5,8 +5,8 @@ import { Feather } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BRAND_COLOR } from '../constants';
 import { useAuthStore } from '../stores';
-import { View, StyleSheet, TouchableOpacity } from 'react-native';
-import { Text } from 'react-native-paper';
+import { View, StyleSheet, TouchableOpacity, Text } from 'react-native';
+import { Text as PaperText } from 'react-native-paper';
 import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 
 // Import the screens
@@ -54,7 +54,7 @@ function CustomBackButton({ navigation }: { navigation: any }) {
         justifyContent: 'center',
       }}
     >
-      <Feather name="arrow-left" size={18} color="#000" />
+      <Text>←</Text>
     </TouchableOpacity>
   );
 }
@@ -166,7 +166,7 @@ function MainTabs() {
             iconName = 'user';
           }
 
-          return <Feather name={iconName} size={size} color={color} />;
+          return <Feather name={iconName as any} size={size} color={color} />;
         },
         tabBarActiveTintColor: BRAND_COLOR,
         tabBarInactiveTintColor: 'gray',
@@ -218,7 +218,7 @@ function LoadingScreen() {
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <View style={styles.loadingContainer}>
-        <Text variant="headlineMedium">Loading...</Text>
+        <PaperText variant="headlineMedium">Loading...</PaperText>
       </View>
     </SafeAreaView>
   );

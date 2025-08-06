@@ -25,6 +25,8 @@ interface MultiSelectProps {
   disabled?: boolean;
   title?: string; // Title for the modal
   label?: string; // Label for the floating label pattern
+  /** Maximum number of items that can be selected (defaults to 3). */
+  maxSelections?: number;
 }
 
 export const MultiSelect: React.FC<MultiSelectProps> = ({
@@ -35,6 +37,7 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
   disabled = false,
   title = 'Select Options',
   label,
+  maxSelections = 3,
 }) => {
   const paperTheme = useTheme();
   const [modalVisible, setModalVisible] = useState(false);
@@ -70,7 +73,7 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
     });
 
   const openModal = () => {
-    if (!disabled && selectedValues.length < 3) {
+    if (!disabled && selectedValues.length < maxSelections) {
       // Initialize temp selection with current selection
       setIsFocused(true);
       setTempSelectedValues([...selectedValues]);
@@ -93,9 +96,9 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
   };
 
   const handleOptionPress = (optionValue: any) => {
-    // Add to temp selection only if we haven't reached the limit of 3
+    // Add to temp selection only if we haven't reached the limit
     setTempSelectedValues(prev => {
-      if (prev.length < 3) {
+      if (prev.length < maxSelections) {
         return [...prev, optionValue];
       }
       return prev;
@@ -151,10 +154,10 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
         <PaperContainer title={label}>
           <TouchableOpacity
             onPress={openModal}
-            disabled={disabled || selectedValues.length >= 3}
+            disabled={disabled || selectedValues.length >= maxSelections}
             style={[
               styles.paperInputContainer,
-              (disabled || selectedValues.length >= 3) && styles.disabled,
+              (disabled || selectedValues.length >= maxSelections) && styles.disabled,
             ]}
           >
             <View style={styles.contentContainer}>
@@ -178,14 +181,14 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
               </Chip>
             ))}
               
-              {selectedValues.length < 3 && selectedOptions.length === 0 && (
+              {selectedValues.length < maxSelections && selectedOptions.length === 0 && (
                 <View style={[
                   styles.placeholderContainer,
                   { flex: 1 }, // Restore flex for initial placeholder height
                 ]}>
                   <Text style={[
                     styles.placeholderText,
-                    { color: theme.colors.text.tertiary }
+                    { color: theme.colors.text.secondary }
                   ]}>
                     {placeholder}
                   </Text>
@@ -197,11 +200,11 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
       ) : (
         <TouchableOpacity
           onPress={openModal}
-          disabled={disabled || selectedValues.length >= 3}
+          disabled={disabled || selectedValues.length >= maxSelections}
           style={[
             globalStyles.input, // Applied first
             styles.inputContainer, // Applied second - OVERRIDES globalStyles!
-            (disabled || selectedValues.length >= 3) && styles.disabled,
+            (disabled || selectedValues.length >= maxSelections) && styles.disabled,
           ]}
         >
           <View style={styles.contentContainer}>
@@ -226,14 +229,14 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
             ))}
             
             {/* Placeholder text area */}
-            {selectedValues.length < 3 && selectedOptions.length === 0 && (
+            {selectedValues.length < maxSelections && selectedOptions.length === 0 && (
               <View style={[
                 styles.placeholderContainer,
                 { flex: 1 }, // Restore flex for initial placeholder height
               ]}>
                 <Text style={[
                   styles.placeholderText,
-                  { color: theme.colors.text.tertiary }
+                  { color: theme.colors.text.secondary }
                 ]}>
                   {(label || placeholder)}
                 </Text>
@@ -367,7 +370,7 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
               showsVerticalScrollIndicator={true}
             >
               {availableOptions.map((option, index) => {
-                const isDisabled = tempSelectedValues.length >= 3;
+                const isDisabled = tempSelectedValues.length >= maxSelections;
                 return (
                   <TouchableOpacity
                     key={option.value}

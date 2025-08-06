@@ -2,8 +2,9 @@ import React, { useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { PaperProvider, configureFonts, MD3LightTheme } from 'react-native-paper';
+import { PaperProvider, MD3LightTheme } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Notifications from 'expo-notifications';
 import AppNavigator from './src/navigation/AppNavigator';
 import { useAuthStore } from './src/stores';
 import { colors } from './src/styles/colors';
@@ -27,6 +28,15 @@ const paperTheme = {
 const settings = {
   icon: (props: any) => <MaterialCommunityIcons {...props} />,
 };
+
+// Configure notification handler to show notifications while app is in foreground
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
 
 export default function App() {
   const initialize = useAuthStore(state => state.initialize);

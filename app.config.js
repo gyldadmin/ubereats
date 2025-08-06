@@ -6,14 +6,28 @@ export default {
     orientation: "portrait",
     icon: "./assets/icon.png",
     userInterfaceStyle: "light",
-    newArchEnabled: true,
-    splash: {
-      image: "./assets/splash-icon.png",
-      resizeMode: "contain",
-      backgroundColor: "#ffffff"
-    },
+    newArchEnabled: false,
+          splash: {
+        image: "./assets/splash-icon.png",
+        resizeMode: "contain",
+        backgroundColor: "#ffffff"
+      },
+    assetBundlePatterns: [
+      "**/*"
+    ],
+          plugins: [
+    "expo-font"
+  ],
     ios: {
-      supportsTablet: true
+      supportsTablet: true,
+      bundleIdentifier: "com.gyld.native",
+      infoPlist: {
+        UIBackgroundModes: ["remote-notification"],
+        ITSAppUsesNonExemptEncryption: false
+      },
+      entitlements: {
+        "aps-environment": "development"
+      }
     },
     android: {
       adaptiveIcon: {
@@ -26,7 +40,11 @@ export default {
       favicon: "./assets/favicon.png"
     },
     extra: {
-      SENDGRID_API_KEY: process.env.SENDGRID_API_KEY
+      SENDGRID_API_KEY: process.env.SENDGRID_API_KEY,
+      EXPO_PUBLIC_PROJECT_ID: "30fdedf3-f7d6-4b60-8601-2b1cdcf878e1",
+      eas: {
+        projectId: "30fdedf3-f7d6-4b60-8601-2b1cdcf878e1"
+      }
     }
   }
 }; 

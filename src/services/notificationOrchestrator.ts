@@ -2,6 +2,7 @@ import { supabase } from './supabase';
 import { EmailService } from './emailService';
 import { PushService } from './pushService';
 import { getProcessedContentTemplate } from './contentTemplateService';
+import { getPushNotificationLogo, shouldIncludePushLogo } from '../constants/branding';
 import type {
   OrchestrationInputs,
   OrchestrationResponse,
@@ -476,7 +477,11 @@ export class NotificationOrchestrator {
       gathering_ID: inputs.gathering_ID,
       candidate_ID: inputs.candidate_ID,
       content_key: inputs.content_key,
-      template_variables: inputs.template_variables
+      template_variables: inputs.template_variables,
+      // Automatically include company logo in all push notifications
+      ...(shouldIncludePushLogo() && {
+        image_url: getPushNotificationLogo()
+      })
     };
   }
 

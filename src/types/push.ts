@@ -6,9 +6,18 @@ export interface PushServiceInputs {
   title2?: string; // Push subtitle  
   content: string; // Push body content
   
-  // Recipients and timing
-  users: string[]; // Array of user IDs to send push to
+  // Recipients (static - current approach)
+  users?: string[]; // Array of user IDs to send push to - made optional for dynamic support
   send_date: Date; // When to send the push
+  
+  // Dynamic recipient sources (new approach)
+  recipient_source?: {
+    type: 'rsvp_list' | 'user_ids' | 'gyld_members';
+    gathering_id?: string; // For rsvp_list
+    rsvp_status?: 'yes' | 'no' | 'maybe'; // For rsvp_list  
+    user_ids?: string[]; // For user_ids type
+    gyld_id?: string; // For gyld_members type
+  };
   
   // Deep linking
   deep_link?: string; // Format: "ScreenName?param1=value1&param2=value2"
@@ -21,14 +30,27 @@ export interface PushServiceInputs {
   button3_text?: string;
   button3_url?: string;
   
+  // Rich content (images)
+  image_url?: string; // URL to image to display in notification
+  
   // Metadata
   initiated_by: string; // User ID who initiated the push
   gathering_ID?: string; // Optional gathering association
   candidate_ID?: string; // Optional candidate association
   
-  // Content template integration
+  // Content template integration (legacy approach)
   content_key?: string; // Reference to content_templates table
   template_variables?: Record<string, string | number | null>; // Variables for template processing
+  
+  // Dynamic content sources (new approach)
+  content_source?: {
+    template_key: string; // Content template key for dynamic rendering
+    dynamic_data_sources: {
+      gathering_id?: string; // Fetch fresh gathering details
+      user_id?: string; // Fetch fresh user details  
+      candidate_id?: string; // Fetch fresh candidate details
+    };
+  };
 }
 
 // Expo Push Notification Payload Types
@@ -45,6 +67,9 @@ export interface ExpoPushMessage {
   mutableContent?: boolean;
   priority?: 'default' | 'normal' | 'high';
   ttl?: number;
+  richContent?: {
+    image?: string; // Image URL for rich notifications
+  };
 }
 
 export interface ExpoPushTicket {

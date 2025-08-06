@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import EventDateTimePicker from './EventDateTimePicker';
 import { theme } from '../../styles/theme';
 import { supabase } from '../../services/supabase';
+import ConfirmationOverlay from './ConfirmationOverlay';
 
 // Types for the new functionality
 interface MonthData {
@@ -615,44 +616,14 @@ export const DateTimeSlider: React.FC<DateTimeSliderProps> = ({
             </TouchableOpacity>
           </View>
         )}
+        {/* Confirmation overlay inside modal */}
+        <ConfirmationOverlay
+          visible={showSaveChangesPopup}
+          title="Save Changes to Date & Time?"
+          onSave={handleSaveChanges}
+          onDiscard={handleDiscardChanges}
+        />
       </View>
-    </Modal>
-
-    {/* Save Changes Popup */}
-    <Modal
-      visible={showSaveChangesPopup}
-      transparent={true}
-      animationType="fade"
-      onRequestClose={() => setShowSaveChangesPopup(false)}
-    >
-      <TouchableOpacity 
-        style={styles.popupOverlay} 
-        activeOpacity={1} 
-        onPress={() => setShowSaveChangesPopup(false)}
-      >
-        <View style={styles.popupContainer}>
-          <Text style={styles.popupTitle}>Save Changes to Date & Time?</Text>
-          <Text style={styles.popupMessage}>
-            You have unsaved changes that will be lost if you continue.
-          </Text>
-          
-          <View style={styles.popupButtons}>
-            <TouchableOpacity 
-              style={styles.popupNoButton}
-              onPress={handleDiscardChanges}
-            >
-              <Text style={styles.popupNoButtonText}>No</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.popupYesButton}
-              onPress={handleSaveChanges}
-            >
-              <Text style={styles.popupYesButtonText}>Yes</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </TouchableOpacity>
     </Modal>
   </>
   );

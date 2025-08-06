@@ -120,7 +120,13 @@ export class PushService {
           initiated_by: inputs.initiated_by,
           gathering_id: inputs.gathering_ID,
           candidate_id: inputs.candidate_ID
-        }
+        },
+        // Add rich content with image if provided
+        ...(inputs.image_url && {
+          richContent: {
+            image: inputs.image_url
+          }
+        })
       };
 
       const { data: edgeResult, error: edgeError } = await supabase.functions.invoke('send-push-notification', {
