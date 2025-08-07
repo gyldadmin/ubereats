@@ -12,6 +12,7 @@ module.exports = {
   testMatch: ['<rootDir>/e2e/**/!(*jest.config*).e2e.js'],
   setupFilesAfterEnv: ['<rootDir>/e2e/init.js'],
   reporters: ['detox/runners/jest/reporter'],
+  testTimeout: 300000,
   transform: {
     '^.+\\.(js|jsx|ts|tsx)$': 'babel-jest',
   },
