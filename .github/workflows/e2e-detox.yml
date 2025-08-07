@@ -30,7 +30,7 @@ jobs:
 
       - name: Upload Detox log
         if: steps.detox.outcome == 'failure'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: detox-log
           path: detox.log
