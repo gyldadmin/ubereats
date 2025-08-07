@@ -32,4 +32,22 @@ export interface ProcessedContentTemplate {
 
 export interface ContentTemplateVariableData {
   [key: string]: string | number | null | undefined;
+}
+
+// Personalized Messaging Types
+export interface PersonalizedMessageData {
+  user_id: string;
+  email: string;
+  first_name: string;
+  global_variables: Record<string, any>; // Event title, date, etc.
+  user_variables: Record<string, any>;   // First name, custom URL, etc.
+  merged_variables: Record<string, any>; // Combined for template processing
+}
+
+export interface PersonalizedTemplateResult {
+  user_id: string;
+  email: string;
+  processed_template: ProcessedContentTemplate; // Using existing ProcessedContentTemplate
+  success: boolean;
+  error?: string;
 } 

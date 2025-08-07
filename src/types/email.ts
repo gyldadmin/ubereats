@@ -62,6 +62,13 @@ export interface EmailServiceInputs {
   experience_ID?: string; // UUID
   candidate_ID?: string; // UUID
   initiated_by: string; // UUID - user who initiated the email
+  
+  // Individual messaging support
+  send_individual_messages?: boolean; // Default: false (bulk mode)
+  per_user_variables?: Array<{
+    user_id: string;
+    variables: Record<string, any>; // {firstName: "John", customUrl: "app://rsvp/123"}
+  }>;
 }
 
 export interface EmailServiceResponse {

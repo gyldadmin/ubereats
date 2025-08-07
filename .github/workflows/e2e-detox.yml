@@ -1,0 +1,51 @@
+name: mobile-e2e-detox
+
+on:
+  push:
+    branches: [ main, develop, feature/** ]
+  pull_request:
+
+jobs:
+  e2e-ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Build iOS dev client for Detox
+        run: npm run build:e2e:ios
+
+      - name: Run Detox tests (iOS)
+        id: detox
+        continue-on-error: true     # we want subsequent steps to run even on failure
+        run: |
+          npm run test:e2e:ios 2>&1 | tee detox.log
+
+      - name: Upload Detox log
+        if: steps.detox.outcome == 'failure'
+        uses: actions/upload-artifact@v3
+        with:
+          name: detox-log
+          path: detox.log
+
+      - name: Open Autofix PR when Detox fails
+        if: steps.detox.outcome == 'failure'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: autofix-e2e-${{ github.sha }}
+          delete-branch: true
+          title: "Autofix: E2E failure on commit ${{ github.sha }}"
+          body: |
+            The Detox E2E suite failed on commit `${{ github.sha }}`.
+
+            Full log attached as GitHub Action artefact `detox-log`.
+
+            This branch is created automatically so the AI assistant can push fixes restricted to `src/services/**`.
+          commit-message: "chore: trigger autofix for E2E failure"

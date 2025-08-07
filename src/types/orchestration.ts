@@ -1,7 +1,5 @@
 // Notification Orchestration Types
 
-import type { EmailServiceInputs } from './email';
-import type { PushServiceInputs } from './push';
 
 // Orchestration Modes
 export type OrchestrationMode = 'push_preferred' | 'both';
@@ -66,6 +64,13 @@ export interface OrchestrationInputs {
   initiated_by: string; // User ID who initiated
   gathering_ID?: string; // Optional gathering association
   candidate_ID?: string; // Optional candidate association
+  
+  // Individual messaging support
+  send_individual_messages?: boolean; // Default: false (bulk mode)
+  per_user_variables?: Array<{
+    user_id: string;
+    variables: Record<string, any>; // User-specific template variables
+  }>;
 }
 
 // Orchestration Response

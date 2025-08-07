@@ -1,0 +1,36 @@
+{
+  "testRunner": "jest",
+  "runnerConfig": "e2e/init.js",
+  "apps": {
+    "ios.release": {
+      "type": "ios.app",
+      "binaryPath": "ios/build/Build/Products/Release-iphonesimulator/gyld-native.app",
+      "build": "expo prebuild --platform ios --no-install && xcodebuild -workspace ios/gyld-native.xcworkspace -scheme gyld-native -configuration Release -sdk iphonesimulator -derivedDataPath ios/build"
+    },
+    "android.release": {
+      "type": "android.apk",
+      "binaryPath": "android/app/build/outputs/apk/release/app-release.apk",
+      "build": "expo prebuild --platform android --no-install && ./gradlew assembleRelease -p android"
+    }
+  },
+  "devices": {
+    "simulator": {
+      "type": "ios.simulator",
+      "device": { "type": "iPhone 14" }
+    },
+    "emulator": {
+      "type": "android.emulator",
+      "device": { "avdName": "Pixel_API_33" }
+    }
+  },
+  "configurations": {
+    "ios.sim.release": {
+      "device": "simulator",
+      "app": "ios.release"
+    },
+    "android.emu.release": {
+      "device": "emulator",
+      "app": "android.release"
+    }
+  }
+}

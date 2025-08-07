@@ -1,11 +1,10 @@
-import { supabase } from './supabase';
-import { getProcessedContentTemplate } from './contentTemplateService';
 import type { 
   PushServiceInputs, 
   PushServiceResponse, 
   PushTokenInfo
 } from '../types/push';
-import type { NotificationSentRecord } from '../types/email';
+import { getProcessedContentTemplate } from './contentTemplateService';
+import { supabase } from './supabase';
 
 interface StatusOptionLookup {
   id: string;
@@ -18,37 +17,27 @@ interface WorkflowTypeLookup {
 }
 
 export class PushService {
-  private scheduledPushes: Map<string, number> = new Map(); // workflowId -> timeoutId
 
   constructor() {
     // No expo client needed - we'll call Edge Functions instead
   }
 
   /**
-   * Main entry point for sending push notifications
+   * Main entry point for sending push notifications immediately
+   * All scheduling should now be handled by the central scheduler
    */
   public async send(inputs: PushServiceInputs): Promise<PushServiceResponse> {
     try {
-      console.log('PushService: Processing push request', { 
+      console.log('PushService: Processing immediate push request', { 
         users: inputs.users, 
-        title: inputs.title1, 
-        sendDate: inputs.send_date.toISOString() 
+        title: inputs.title1
       });
 
       // Validate inputs
       this.validateInputs(inputs);
 
-      // Check if this should be sent immediately or scheduled
-      const now = new Date();
-      const sendDate = new Date(inputs.send_date);
-
-      if (sendDate <= now) {
         // Send immediately
         return await this.sendImmediately(inputs);
-      } else {
-        // Schedule for future delivery
-        return await this.schedulePush(inputs);
-      }
     } catch (error) {
       console.error('PushService: Error processing push request', error);
       return {
@@ -171,250 +160,11 @@ export class PushService {
     }
   }
 
-  /**
-   * Schedule push for future delivery
-   */
-  private async schedulePush(inputs: PushServiceInputs): Promise<PushServiceResponse> {
-    console.log('PushService: Scheduling push for future delivery');
 
-    // Generate unique workflow ID
-    const workflowId = this.generateWorkflowId();
 
-    // Get status option ID for "pending" and push workflow type
-    const [pendingStatus, pushWorkflowType] = await Promise.all([
-      this.lookupStatusOption('pending'),
-      this.lookupWorkflowType('push')
-    ]);
 
-    // Store full PushServiceInputs in workflow_data as JSON
-    const workflowData = {
-      ...inputs,
-      // Ensure send_date is stored as ISO string for JSON serialization
-      send_date: new Date(inputs.send_date).toISOString()
-    };
 
-    // Create planned_workflows record with workflow_data
-    const { error: workflowError } = await supabase
-      .from('planned_workflows')
-      .insert({
-        status: pendingStatus.id,
-        gathering_id: inputs.gathering_ID || null,
-        candidate_id: inputs.candidate_ID || null,
-        workflow_id: workflowId,
-        workflow_type: pushWorkflowType.id,
-        workflow_data: workflowData,
-        description: 'push'
-      });
 
-    if (workflowError) {
-      throw new Error(`Failed to create planned workflow: ${workflowError.message}`);
-    }
-
-    // Calculate delay in milliseconds  
-    const now = new Date();
-    const sendDate = new Date(inputs.send_date);
-    const delayMs = sendDate.getTime() - now.getTime();
-
-    // Schedule the push using setTimeout for database-driven job queue
-    const timeoutId = setTimeout(async () => {
-      try {
-        await this.executeScheduledPush(workflowId);
-      } catch (error) {
-        console.error('PushService: Error executing scheduled push', { workflowId, error });
-      }
-    }, delayMs) as unknown as number;
-
-    // Store timeout reference for potential cancellation
-    this.scheduledPushes.set(workflowId, timeoutId);
-
-    console.log('PushService: Push scheduled successfully', { 
-      workflowId, 
-      scheduledFor: sendDate.toISOString(),
-      delayMs 
-    });
-
-    return {
-      success: true,
-      message: `Push scheduled for ${sendDate.toISOString()}`,
-      workflowId: workflowId
-    };
-  }
-
-  /**
-   * Execute a scheduled push (called by setTimeout)
-   */
-  private async executeScheduledPush(workflowId: string): Promise<void> {
-    console.log('PushService: Executing scheduled push', { workflowId });
-
-    try {
-      // Fetch workflow data including the stored PushServiceInputs
-      const { data: workflowData, error: workflowError } = await supabase
-        .from('planned_workflows')
-        .select(`
-          status,
-          workflow_data,
-          status_options!inner(label)
-        `)
-        .eq('workflow_id', workflowId)
-        .single();
-
-      if (workflowError) {
-        console.error('PushService: Failed to lookup workflow status', { workflowId, error: workflowError });
-        return;
-      }
-
-      const statusLabel = (workflowData.status_options as any).label;
-      
-      if (statusLabel !== 'pending') {
-        console.log('PushService: Workflow no longer pending, skipping push', { 
-          workflowId, 
-          currentStatus: statusLabel 
-        });
-        return;
-      }
-
-      // Extract PushServiceInputs from workflow_data
-      if (!workflowData.workflow_data) {
-        console.error('PushService: No workflow_data found for scheduled push', { workflowId });
-        return;
-      }
-
-      // Deserialize the PushServiceInputs from JSON
-      const inputs: PushServiceInputs = {
-        ...workflowData.workflow_data,
-        // Convert send_date back to Date object
-        send_date: new Date(workflowData.workflow_data.send_date)
-      };
-
-      console.log('PushService: Retrieved inputs from workflow_data for scheduled push', { 
-        workflowId, 
-        inputsPreview: {
-          title1: inputs.title1,
-          users: inputs.users,
-          content: inputs.content?.substring(0, 50) + '...'
-        }
-      });
-
-      // Send the push
-      await this.sendImmediately(inputs);
-
-      // Update workflow status to completed
-      const completedStatus = await this.lookupStatusOption('completed');
-      await supabase
-        .from('planned_workflows')
-        .update({ status: completedStatus.id })
-        .eq('workflow_id', workflowId);
-
-      // Clean up scheduled reference
-      this.scheduledPushes.delete(workflowId);
-
-      console.log('PushService: Scheduled push completed successfully', { workflowId });
-    } catch (error) {
-      console.error('PushService: Error in executeScheduledPush', { workflowId, error });
-      
-      // Update workflow status to failed
-      try {
-        const failedStatus = await this.lookupStatusOption('failed');
-        await supabase
-          .from('planned_workflows')
-          .update({ status: failedStatus.id })
-          .eq('workflow_id', workflowId);
-      } catch (statusError) {
-        console.error('PushService: Failed to update workflow status to failed', statusError);
-      }
-    }
-  }
-
-  /**
-   * Process pending push workflows from database
-   * Useful for handling missed scheduled pushes after app restart
-   */
-  public async processPendingWorkflows(): Promise<void> {
-    console.log('PushService: Processing pending push workflows from database');
-    
-    try {
-      // Query for pending push workflows
-      const { data: pendingWorkflows, error } = await supabase
-        .from('planned_workflows')
-        .select(`
-          workflow_id,
-          workflow_data,
-          created_at,
-          status_options!inner(label),
-          workflow_type!inner(label)
-        `)
-        .eq('status_options.label', 'pending')
-        .eq('workflow_type.label', 'push');
-
-      if (error) {
-        console.error('PushService: Failed to fetch pending workflows', error);
-        return;
-      }
-
-      if (!pendingWorkflows?.length) {
-        console.log('PushService: No pending push workflows found');
-        return;
-      }
-
-      console.log(`PushService: Found ${pendingWorkflows.length} pending push workflows`);
-
-      // Process each pending workflow
-      for (const workflow of pendingWorkflows) {
-        try {
-          if (!workflow.workflow_data) {
-            console.warn('PushService: Skipping workflow with no workflow_data', { 
-              workflowId: workflow.workflow_id 
-            });
-            continue;
-          }
-
-          // Check if push is past due
-          const sendDate = new Date(workflow.workflow_data.send_date);
-          const now = new Date();
-          
-          if (sendDate <= now) {
-            // Push is past due, send immediately
-            console.log('PushService: Processing overdue push workflow', { 
-              workflowId: workflow.workflow_id,
-              scheduledFor: sendDate.toISOString(),
-              overdueMins: Math.round((now.getTime() - sendDate.getTime()) / (1000 * 60))
-            });
-            
-            await this.executeScheduledPush(workflow.workflow_id);
-          } else {
-            // Push is not yet due, reschedule it
-            const delayMs = sendDate.getTime() - now.getTime();
-            console.log('PushService: Rescheduling future push workflow', { 
-              workflowId: workflow.workflow_id,
-              scheduledFor: sendDate.toISOString(),
-              delayMins: Math.round(delayMs / (1000 * 60))
-            });
-
-            const timeoutId = setTimeout(async () => {
-              try {
-                await this.executeScheduledPush(workflow.workflow_id);
-              } catch (error) {
-                console.error('PushService: Error executing rescheduled push', { 
-                  workflowId: workflow.workflow_id, 
-                  error 
-                });
-              }
-            }, delayMs) as unknown as number;
-
-            // Store timeout reference for potential cancellation
-            this.scheduledPushes.set(workflow.workflow_id, timeoutId);
-          }
-        } catch (workflowError) {
-          console.error('PushService: Error processing workflow', { 
-            workflowId: workflow.workflow_id, 
-            error: workflowError 
-          });
-        }
-      }
-    } catch (error) {
-      console.error('PushService: Error in processPendingWorkflows', error);
-    }
-  }
 
   /**
    * Get push tokens for users who have push notifications enabled
@@ -597,10 +347,7 @@ export class PushService {
     return data as WorkflowTypeLookup;
   }
 
-  private generateWorkflowId(): string {
-    // Generate UUID-like string for workflow tracking
-    return 'push_workflow_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-  }
+
 
   private validateInputs(inputs: PushServiceInputs): void {
     // Required field validation

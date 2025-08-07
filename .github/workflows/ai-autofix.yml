@@ -1,0 +1,36 @@
+name: ai-autofix
+
+on:
+  pull_request:
+    branches:
+      - 'autofix-e2e-*'
+    types: [opened, synchronize, reopened]
+
+jobs:
+  cursor-fix:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      # Install deps so the agent can run tests locally
+      - run: npm ci --legacy-peer-deps
+
+      - name: Run AI assistant (Cursor)
+        uses: cursor-sh/action@v1 # Placeholder, replace with actual Cursor GitHub Action
+        with:
+          openai_key: ${{ secrets.OPENAI_API_KEY }}
+          instructions: |
+            The Detox E2E workflow failed. The log is available as the artefact `detox-log`.
+            1. Re-run `npm run test:e2e:ios`.
+            2. Analyse the failure affecting the button `btnPushEmail3Min`.
+            3. Fix code ONLY under `src/services/**` or the E2E tests themselves.
+            4. Do NOT change database schema or create migrations.
+            5. Commit and push. CI will re-run; stop after success or 3 attempts.

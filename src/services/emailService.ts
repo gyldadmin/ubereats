@@ -1,25 +1,22 @@
-import { supabase } from './supabase';
 import Constants from 'expo-constants';
-import { getProcessedContentTemplate } from './contentTemplateService';
 import { 
+    DynamicContentData,
+    EmailAddressLookup,
   EmailServiceInputs, 
   EmailServiceResponse, 
   EmailTemplateLookup, 
-  EmailAddressLookup, 
+    GatheringDynamicData,
+    NotificationSentRecord,
   NotificationTypeLookup, 
-  StatusOptionLookup,
   SendGridPayload,
   SendGridPersonalization,
-  ScheduledEmailRecord,
-  NotificationSentRecord,
-  UserEmailInfo,
-  GatheringDynamicData,
-  DynamicContentData
+    StatusOptionLookup
 } from '../types/email';
+import { getProcessedContentTemplate } from './contentTemplateService';
+import { supabase } from './supabase';
 
 export class EmailService {
   private sendGridApiKey: string;
-  private scheduledEmails: Map<string, number> = new Map();
 
   constructor() {
     // Load SendGrid API key from hidden file
@@ -27,47 +24,31 @@ export class EmailService {
   }
 
   /**
-   * Main entry point for sending emails
-   * Handles both immediate and scheduled emails
+   * Main entry point for sending emails immediately
+   * All scheduling should now be handled by the central scheduler
    */
   async send(inputs: EmailServiceInputs): Promise<EmailServiceResponse> {
     try {
-      console.log('EmailService: Processing email request', {
+      console.log('EmailService: Processing immediate email request', {
         template: inputs.template_name,
         email_type: inputs.email_type,
         recipients: inputs.to_address?.length || 'dynamic',
         has_recipient_source: !!inputs.recipient_source,
-        has_content_source: !!inputs.content_source,
-        scheduled_for: inputs.send_date
+        has_content_source: !!inputs.content_source
       });
 
       // Validate inputs
       this.validateInputs(inputs);
 
-      // Check if email should be sent immediately or scheduled
-      const now = new Date();
-      const sendDate = new Date(inputs.send_date);
-      const isImmediate = sendDate <= now;
-
-      if (isImmediate) {
-        // Resolve dynamic inputs before sending immediately
+      // Resolve dynamic inputs and send immediately
         const resolvedInputs = await this.resolveDynamicInputs(inputs);
         const emailId = await this.sendImmediately(resolvedInputs);
+      
         return {
           success: true,
           message: 'Email sent successfully',
           emailId
         };
-      } else {
-        // For scheduled emails, store the dynamic inputs in workflow_data
-        // They will be resolved at send time by executeScheduledEmail
-        const workflowId = await this.scheduleEmail(inputs);
-        return {
-          success: true,
-          message: `Email scheduled for ${sendDate.toISOString()}`,
-          workflowId
-        };
-      }
 
     } catch (error) {
       console.error('EmailService: Error processing email request', error);
@@ -121,197 +102,11 @@ export class EmailService {
     }
   }
 
-  /**
-   * Schedule email for future delivery
-   */
-  private async scheduleEmail(inputs: EmailServiceInputs): Promise<string> {
-    console.log('EmailService: Scheduling email for future delivery');
 
-    // Generate unique workflow ID
-    const workflowId = this.generateWorkflowId();
 
-    // Get status option ID for "pending" and email workflow type
-    const [pendingStatus, emailWorkflowType] = await Promise.all([
-      this.lookupStatusOption('pending'),
-      this.lookupWorkflowType('email')
-    ]);
 
-    // Store full EmailServiceInputs in workflow_data as JSON
-    const workflowData = {
-      ...inputs,
-      // Ensure send_date is stored as ISO string for JSON serialization
-      send_date: new Date(inputs.send_date).toISOString()
-    };
 
-    // Create planned_workflows record with workflow_data
-    const { error: workflowError } = await supabase
-      .from('planned_workflows')
-      .insert({
-        status: pendingStatus.id,
-        gathering_id: inputs.gathering_ID || null,
-        candidate_id: inputs.candidate_ID || null,
-        workflow_id: workflowId,
-        workflow_type: emailWorkflowType.id,
-        workflow_data: workflowData,
-        description: 'email'
-      });
 
-    if (workflowError) {
-      throw new Error(`Failed to create planned workflow: ${workflowError.message}`);
-    }
-
-    // Calculate delay in milliseconds
-    const now = new Date();
-    const sendDate = new Date(inputs.send_date);
-    const delayMs = sendDate.getTime() - now.getTime();
-
-    // Schedule the email using setTimeout for database-driven job queue
-    const timeoutId = setTimeout(async () => {
-      try {
-        await this.executeScheduledEmail(workflowId);
-      } catch (error) {
-        console.error('EmailService: Error executing scheduled email', { workflowId, error });
-      }
-    }, delayMs) as unknown as number;
-
-    // Store timeout reference for potential cancellation
-    this.scheduledEmails.set(workflowId, timeoutId);
-
-    console.log('EmailService: Email scheduled successfully', { 
-      workflowId, 
-      scheduledFor: sendDate.toISOString(),
-      delayMs 
-    });
-
-    return workflowId;
-  }
-
-  /**
-   * Execute a scheduled email (called by setTimeout)
-   */
-  private async executeScheduledEmail(workflowId: string): Promise<void> {
-    console.log('EmailService: Executing scheduled email', { workflowId });
-
-    try {
-      // Fetch workflow data including the stored EmailServiceInputs
-      const { data: workflowData, error: workflowError } = await supabase
-        .from('planned_workflows')
-        .select(`
-          status,
-          workflow_data,
-          status_options!inner(label)
-        `)
-        .eq('workflow_id', workflowId)
-        .single();
-
-      if (workflowError) {
-        console.error('EmailService: Failed to lookup workflow status', { workflowId, error: workflowError });
-        return;
-      }
-
-      const statusLabel = (workflowData.status_options as any).label;
-      
-      if (statusLabel !== 'pending') {
-        console.log('EmailService: Workflow no longer pending, skipping email', { 
-          workflowId, 
-          currentStatus: statusLabel 
-        });
-        return;
-      }
-
-      // Extract EmailServiceInputs from workflow_data
-      if (!workflowData.workflow_data) {
-        console.error('EmailService: No workflow_data found for scheduled email', { workflowId });
-        return;
-      }
-
-      // Deserialize the EmailServiceInputs from JSON
-      const inputs: EmailServiceInputs = {
-        ...workflowData.workflow_data,
-        // Convert send_date back to Date object
-        send_date: new Date(workflowData.workflow_data.send_date)
-      };
-
-      console.log('EmailService: Retrieved inputs from workflow_data for scheduled email', { 
-        workflowId, 
-        inputsPreview: {
-          template_name: inputs.template_name,
-          email_type: inputs.email_type,
-          subject: inputs.subject,
-          to_address: inputs.to_address?.length || 'dynamic',
-          has_recipient_source: !!inputs.recipient_source,
-          has_content_source: !!inputs.content_source
-        }
-      });
-
-      // Resolve dynamic inputs before sending (fresh data at send time!)
-      const resolvedInputs = await this.resolveDynamicInputs(inputs);
-      
-      // Send the email with resolved inputs
-      await this.sendImmediately(resolvedInputs);
-
-      // Update workflow status to completed
-      const completedStatus = await this.lookupStatusOption('completed');
-      await supabase
-        .from('planned_workflows')
-        .update({ status: completedStatus.id })
-        .eq('workflow_id', workflowId);
-
-      console.log('EmailService: Scheduled email executed successfully', { workflowId });
-
-    } catch (error) {
-      console.error('EmailService: Error executing scheduled email', { workflowId, error });
-      
-      // Update workflow status to failed (we'll use 'cancelled' as there's no 'failed' status)
-      try {
-        const cancelledStatus = await this.lookupStatusOption('cancelled');
-        await supabase
-          .from('planned_workflows')
-          .update({ status: cancelledStatus.id })
-          .eq('workflow_id', workflowId);
-      } catch (statusError) {
-        console.error('EmailService: Failed to update workflow status after error', { workflowId, statusError });
-      }
-    } finally {
-      // Clean up the timeout reference
-      this.scheduledEmails.delete(workflowId);
-    }
-  }
-
-  /**
-   * Cancel a scheduled email
-   */
-  async cancelScheduledEmail(workflowId: string): Promise<boolean> {
-    try {
-      console.log('EmailService: Cancelling scheduled email', { workflowId });
-
-      // Clear the timeout if it exists
-      const timeoutId = this.scheduledEmails.get(workflowId);
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-        this.scheduledEmails.delete(workflowId);
-      }
-
-      // Update database status to cancelled
-      const cancelledStatus = await this.lookupStatusOption('cancelled');
-      const { error } = await supabase
-        .from('planned_workflows')
-        .update({ status: cancelledStatus.id })
-        .eq('workflow_id', workflowId);
-
-      if (error) {
-        console.error('EmailService: Failed to update workflow status to cancelled', { workflowId, error });
-        return false;
-      }
-
-      console.log('EmailService: Successfully cancelled scheduled email', { workflowId });
-      return true;
-
-    } catch (error) {
-      console.error('EmailService: Error cancelling scheduled email', { workflowId, error });
-      return false;
-    }
-  }
 
   /**
    * Database lookup methods
@@ -700,101 +495,9 @@ export class EmailService {
     );
   }
 
-  /**
-   * Process pending email workflows from database
-   * Useful for handling missed scheduled emails after app restart
-   */
-  public async processPendingWorkflows(): Promise<void> {
-    console.log('EmailService: Processing pending email workflows from database');
-    
-    try {
-      // Query for pending email workflows that are past due
-      const { data: pendingWorkflows, error } = await supabase
-        .from('planned_workflows')
-        .select(`
-          workflow_id,
-          workflow_data,
-          created_at,
-          status_options!inner(label),
-          workflow_type!inner(label)
-        `)
-        .eq('status_options.label', 'pending')
-        .eq('workflow_type.label', 'email');
 
-      if (error) {
-        console.error('EmailService: Failed to fetch pending workflows', error);
-        return;
-      }
 
-      if (!pendingWorkflows?.length) {
-        console.log('EmailService: No pending email workflows found');
-        return;
-      }
 
-      console.log(`EmailService: Found ${pendingWorkflows.length} pending email workflows`);
-
-      // Process each pending workflow
-      for (const workflow of pendingWorkflows) {
-        try {
-          if (!workflow.workflow_data) {
-            console.warn('EmailService: Skipping workflow with no workflow_data', { 
-              workflowId: workflow.workflow_id 
-            });
-            continue;
-          }
-
-          // Check if email is past due
-          const sendDate = new Date(workflow.workflow_data.send_date);
-          const now = new Date();
-          
-          if (sendDate <= now) {
-            // Email is past due, send immediately
-            console.log('EmailService: Processing overdue email workflow', { 
-              workflowId: workflow.workflow_id,
-              scheduledFor: sendDate.toISOString(),
-              overdueMins: Math.round((now.getTime() - sendDate.getTime()) / (1000 * 60))
-            });
-            
-            await this.executeScheduledEmail(workflow.workflow_id);
-          } else {
-            // Email is not yet due, reschedule it
-            const delayMs = sendDate.getTime() - now.getTime();
-            console.log('EmailService: Rescheduling future email workflow', { 
-              workflowId: workflow.workflow_id,
-              scheduledFor: sendDate.toISOString(),
-              delayMins: Math.round(delayMs / (1000 * 60))
-            });
-
-            const timeoutId = setTimeout(async () => {
-              try {
-                await this.executeScheduledEmail(workflow.workflow_id);
-              } catch (error) {
-                console.error('EmailService: Error executing rescheduled email', { 
-                  workflowId: workflow.workflow_id, 
-                  error 
-                });
-              }
-            }, delayMs) as unknown as number;
-
-            // Store timeout reference for potential cancellation
-            this.scheduledEmails.set(workflow.workflow_id, timeoutId);
-          }
-        } catch (workflowError) {
-          console.error('EmailService: Error processing workflow', { 
-            workflowId: workflow.workflow_id, 
-            error: workflowError 
-          });
-        }
-      }
-    } catch (error) {
-      console.error('EmailService: Error in processPendingWorkflows', error);
-    }
-  }
-
-  private generateWorkflowId(): string {
-    // Generate UUID-like string for workflow tracking
-    return 'workflow_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-  }
 
   /**
    * Dynamic input resolution

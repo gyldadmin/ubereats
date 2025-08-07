@@ -1,41 +1,62 @@
-import { supabase } from './supabase';
+import { getPushNotificationLogo, shouldIncludePushLogo } from '../constants/branding';
+import type { EmailServiceInputs } from '../types/email';
+import type {
+    OrchestrationInputs,
+    OrchestrationResponse
+} from '../types/orchestration';
+import type { PushServiceInputs } from '../types/push';
+import { getProcessedContentTemplate } from './contentTemplateService';
 import { EmailService } from './emailService';
 import { PushService } from './pushService';
-import { getProcessedContentTemplate } from './contentTemplateService';
-import { getPushNotificationLogo, shouldIncludePushLogo } from '../constants/branding';
+import type { Repositories } from './repositories';
+import { supabase } from './supabase';
+
+// Re-export types from repositories for backward compatibility
 import type {
-  OrchestrationInputs,
-  OrchestrationResponse,
-  PushInputsFromOrchestration,
-  EmailInputsFromOrchestration
-} from '../types/orchestration';
-import type { EmailServiceInputs } from '../types/email';
-import type { PushServiceInputs } from '../types/push';
-
-interface StatusOptionLookup {
-  id: string;
-  label: string;
-}
-
-interface WorkflowTypeLookup {
-  id: string;
-  label: string;
-}
-
-interface UserEmailInfo {
-  user_id: string;
-  email: string;
-  first_name?: string;
-}
+    StatusOptionLookup,
+    UserEmailInfo,
+    WorkflowTypeLookup
+} from './repositories';
 
 export class NotificationOrchestrator {
   private emailService: EmailService;
   private pushService: PushService;
+  private repositories: Repositories;
   private scheduledOrchestrations: Map<string, number> = new Map(); // workflowId -> timeoutId
 
-  constructor() {
-    this.emailService = new EmailService();
-    this.pushService = new PushService();
+  constructor(
+    emailService?: EmailService,
+    pushService?: PushService,
+    repositories?: Repositories
+  ) {
+    // Use provided services or create defaults (for dependency injection)
+    this.emailService = emailService || new EmailService();
+    this.pushService = pushService || new PushService();
+    
+    // Import repositories if not provided
+    if (repositories) {
+      this.repositories = repositories;
+    } else {
+      // Dynamic import to avoid circular dependencies
+      this.initializeRepositories();
+    }
+  }
+
+  /**
+   * Initialize repositories dynamically to avoid circular dependencies
+   */
+  private async initializeRepositories(): Promise<void> {
+    const { repositories } = await import('./repositories');
+    this.repositories = repositories;
+  }
+
+  /**
+   * Ensure repositories are initialized before use
+   */
+  private async ensureRepositories(): Promise<void> {
+    if (!this.repositories) {
+      await this.initializeRepositories();
+    }
   }
 
   /**
@@ -270,22 +291,17 @@ export class NotificationOrchestrator {
       send_date: new Date(inputs.send_date).toISOString()
     };
 
-    // Create planned_workflows record with workflow_data
-    const { error: workflowError } = await supabase
-      .from('planned_workflows')
-      .insert({
-        status: pendingStatus.id,
-        gathering_id: inputs.gathering_ID || null,
-        candidate_id: inputs.candidate_ID || null,
-        workflow_id: workflowId,
-        workflow_type: orchestrationWorkflowType.id,
-        workflow_data: workflowData,
-        description: `orchestration_${inputs.mode}`
-      });
-
-    if (workflowError) {
-      throw new Error(`Failed to create planned workflow: ${workflowError.message}`);
-    }
+    // Create planned_workflows record with workflow_data using repository
+    await this.ensureRepositories();
+    await this.repositories.workflowRepository.createWorkflow({
+      status: pendingStatus.id,
+      gathering_id: inputs.gathering_ID || null,
+      candidate_id: inputs.candidate_ID || null,
+      workflow_id: workflowId,
+      workflow_type: orchestrationWorkflowType.id,
+      workflow_data: workflowData,
+      description: `orchestration_${inputs.mode}`
+    });
 
     // Calculate delay in milliseconds
     const now = new Date();
@@ -525,27 +541,22 @@ export class NotificationOrchestrator {
    * Get user email addresses for given user IDs
    */
   private async getUserEmails(userIds: string[]): Promise<UserEmailInfo[]> {
+    await this.ensureRepositories();
     console.log('NotificationOrchestrator: Fetching user emails', { userCount: userIds.length });
 
-    const { data, error } = await supabase
-      .from('users_public')
-      .select('user_id, email, first_name')
-      .in('user_id', userIds)
-      .not('email', 'is', null);
+    try {
+      const userEmails = await this.repositories.userRepository.getUserEmails(userIds);
+      
+      console.log('NotificationOrchestrator: Valid user emails found', {
+        total: userEmails.length,
+        valid: userEmails.length
+      });
 
-    if (error) {
+      return userEmails;
+    } catch (error) {
       console.error('NotificationOrchestrator: Error fetching user emails', error);
       return [];
     }
-
-    const validEmails = (data || []).filter(user => user.email);
-
-    console.log('NotificationOrchestrator: Valid user emails found', {
-      total: data?.length || 0,
-      valid: validEmails.length
-    });
-
-    return validEmails;
   }
 
   /**
@@ -577,44 +588,13 @@ export class NotificationOrchestrator {
    * Lookup helper methods
    */
   private async lookupStatusOption(label: string): Promise<StatusOptionLookup> {
-    const { data, error } = await supabase
-      .from('status_options')
-      .select('id, label')
-      .eq('label', label)
-      .single();
-
-    if (error || !data) {
-      throw new Error(`Status option '${label}' not found: ${error?.message}`);
-    }
-
-    return data as StatusOptionLookup;
+    await this.ensureRepositories();
+    return await this.repositories.statusRepository.lookupStatusOption(label);
   }
 
   private async lookupOrCreateWorkflowType(label: string): Promise<WorkflowTypeLookup> {
-    // First try to find existing workflow type
-    const { data, error } = await supabase
-      .from('workflow_type')
-      .select('id, label')
-      .eq('label', label)
-      .single();
-
-    if (data) {
-      return data as WorkflowTypeLookup;
-    }
-
-    // If not found, create it
-    console.log('NotificationOrchestrator: Creating new workflow type', { label });
-    const { data: newData, error: createError } = await supabase
-      .from('workflow_type')
-      .insert({ label })
-      .select('id, label')
-      .single();
-
-    if (createError || !newData) {
-      throw new Error(`Failed to create workflow type '${label}': ${createError?.message}`);
-    }
-
-    return newData as WorkflowTypeLookup;
+    await this.ensureRepositories();
+    return await this.repositories.workflowRepository.lookupOrCreateWorkflowType(label);
   }
 
   private generateWorkflowId(): string {
@@ -632,4 +612,7 @@ export class NotificationOrchestrator {
     if (!inputs.send_date) throw new Error('send_date is required');
     if (!inputs.initiated_by) throw new Error('initiated_by is required');
   }
-} 
+}
+
+// Export default instance for backward compatibility
+export const notificationOrchestrator = new NotificationOrchestrator(); 

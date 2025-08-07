@@ -3,17 +3,17 @@ import React, { useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { ActivityIndicator, Button, Modal, Portal, Text } from 'react-native-paper';
 import {
-  Checkbox,
-  ChipSelection,
-  EventDateTimePicker,
-  Input,
-  MultiSelect,
-  NativeDateTimePicker,
-  PaperDropdown,
-  SearchableDropdown,
-  SegmentedInput,
-  TextArea,
-  Toggle
+    Checkbox,
+    ChipSelection,
+    EventDateTimePicker,
+    Input,
+    MultiSelect,
+    NativeDateTimePicker,
+    PaperDropdown,
+    SearchableDropdown,
+    SegmentedInput,
+    TextArea,
+    Toggle
 } from '../components/inputs';
 import { GatheringCardCompactV1, ImageUpload } from '../components/ui';
 import { WriteEmail } from '../components/ui/write-email';
@@ -24,6 +24,7 @@ import { emailService } from '../services/emailService';
 import { NotificationOrchestrator } from '../services/notificationOrchestrator';
 import { PushService } from '../services/pushService';
 import { pushTokenService } from '../services/pushTokenService';
+import { centralScheduler as scheduler } from '../services/scheduler';
 import { supabase } from '../services/supabase';
 import { useAuthStore } from '../stores/authStore';
 import { theme } from '../styles/theme';
@@ -1146,7 +1147,7 @@ const handleTestGatheringInviteWithTemplates = async () => {
       };
 
       // Send the invitation
-      const result = await notificationOrchestrator.orchestrate(gatheringInviteInputs);
+      const result = await notificationOrchestrator.send(gatheringInviteInputs);
       
       if (result.success) {
         console.log('HomeScreen: Gathering invitation sent successfully', result);
@@ -1248,6 +1249,232 @@ const handleTestGatheringInviteWithTemplates = async () => {
     } catch (error) {
       console.error('HomeScreen: Error testing dynamic email', error);
       alert(`❌ Dynamic Email Error!\n\nError: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  // Event invitation test functions for wild testing
+  const handleEventInvitePushPreferred = async () => {
+    try {
+      console.log('HomeScreen: Testing event invitation - push preferred...');
+      
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      const currentUserId = user?.id;
+      
+      if (!currentUserId) {
+        alert('❌ User not authenticated');
+        return;
+      }
+
+      // Get all users for mass invite
+      const { data: users, error: usersError } = await supabase
+        .from('users_public')
+        .select('user_id, first')
+        .limit(50); // Limit for testing
+
+      if (usersError || !users || users.length === 0) {
+        alert('❌ Error fetching users: ' + (usersError?.message || 'No users found'));
+        return;
+      }
+
+      // Use the first upcoming event we found
+      const eventId = '8013abc8-410f-43b1-89b9-69df4505dbcd'; // "F" event
+      const eventTitle = 'F';
+      const eventDate = 'September 2, 2025';
+      const eventTime = '10:00 PM';
+
+      const orchestrationInputs: OrchestrationInputs = {
+        mode: 'push_preferred', // Required property
+        send_date: new Date(), // Required property - send immediately
+        users: users.map(u => u.user_id),
+        title: `Join us: ${eventTitle}`,
+        content: `You're invited! ${eventDate} at ${eventTime}`,
+        email_template_name: 'basic_with_button',
+        email_type: 'notification',
+        sender_fullname: 'Gyld Team',
+        secondary_content: 'This is an exciting opportunity to connect with fellow members.',
+        button1_text: 'RSVP Now',
+        button1_url: `https://app.gyld.org/gathering/${eventId}`,
+        unsubscribe_url: 'https://app.gyld.org/unsubscribe',
+        send_push: true,
+        send_email: false, // Push preferred
+        initiated_by: currentUserId,
+        gathering_ID: eventId
+      };
+
+      console.log('HomeScreen: Sending push preferred event invitation...', { orchestrationInputs });
+      
+      const result = await notificationOrchestrator.send(orchestrationInputs);
+      
+      if (result.success) {
+        alert(`🎉 Event Invitation Sent (Push Preferred)!\n\n` +
+              `✅ Success: ${result.message}\n` +
+              `👥 Recipients: ${users.length} users\n` +
+              `📱 Push: Sent immediately\n` +
+              `📧 Email: Not sent (push preferred)`);
+      } else {
+        alert(`❌ Event Invitation Failed!\n\nError: ${result.error}\n\nMessage: ${result.message}`);
+      }
+      
+    } catch (error) {
+      console.error('HomeScreen: Error testing event invitation', error);
+      alert(`❌ Event Invitation Error!\n\nError: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  const handleEventInvitePushPlusEmail3Min = async () => {
+    try {
+      console.log('HomeScreen: Testing event invitation - push + email in 3 minutes...');
+      
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      const currentUserId = user?.id;
+      
+      if (!currentUserId) {
+        alert('❌ User not authenticated');
+        return;
+      }
+
+      // Get all users for mass invite
+      const { data: users, error: usersError } = await supabase
+        .from('users_public')
+        .select('user_id, first')
+        .limit(50); // Limit for testing
+
+      if (usersError || !users || users.length === 0) {
+        alert('❌ Error fetching users: ' + (usersError?.message || 'No users found'));
+        return;
+      }
+
+      // Use the second upcoming event
+      const eventId = 'd0c30910-0799-4b0d-a539-40285f865de3'; // "Growth at Anthropic" event
+      const eventTitle = 'Growth at Anthropic';
+      const eventDate = 'September 3, 2025';
+      const eventTime = '11:00 PM';
+
+      // Schedule for 3 minutes from now
+      const executeAt = new Date(Date.now() + 3 * 60 * 1000);
+
+      const taskData = {
+        mode: 'both', // Required property
+        send_date: executeAt, // Required property - scheduled time
+        users: users.map(u => u.user_id),
+        title: `Join us: ${eventTitle}`,
+        content: `You're invited! ${eventDate} at ${eventTime}`,
+        email_template_name: 'basic_with_button',
+        email_type: 'notification',
+        sender_fullname: 'Gyld Team',
+        secondary_content: 'This is an exciting opportunity to connect and learn about growth strategies.',
+        button1_text: 'RSVP Now',
+        button1_url: `https://app.gyld.org/gathering/${eventId}`,
+        unsubscribe_url: 'https://app.gyld.org/unsubscribe',
+        send_push: true,
+        send_email: true,
+        initiated_by: currentUserId,
+        gathering_ID: eventId
+      };
+
+      console.log('HomeScreen: Scheduling push + email event invitation for 3 minutes...', { taskData, executeAt });
+      
+      const result = await scheduler.schedule({
+        type: 'orchestration',
+        executeAt,
+        data: taskData
+      });
+      
+      if (result.success) {
+        alert(`🎉 Event Invitation Scheduled (Push + Email)!\n\n` +
+              `✅ Success: Task scheduled\n` +
+              `👥 Recipients: ${users.length} users\n` +
+              `⏰ Will send in: 3 minutes\n` +
+              `📱 Push: Yes\n` +
+              `📧 Email: Yes\n` +
+              `📋 Task ID: ${result.taskId}`);
+      } else {
+        alert(`❌ Event Invitation Scheduling Failed!\n\nError: ${result.error}\n\nMessage: ${result.message}`);
+      }
+      
+    } catch (error) {
+      console.error('HomeScreen: Error scheduling event invitation', error);
+      alert(`❌ Event Invitation Scheduling Error!\n\nError: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  const handleEventInvitePushPlusEmail6Hours = async () => {
+    try {
+      console.log('HomeScreen: Testing event invitation - push + email in 6 hours...');
+      
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      const currentUserId = user?.id;
+      
+      if (!currentUserId) {
+        alert('❌ User not authenticated');
+        return;
+      }
+
+      // Get all users for mass invite
+      const { data: users, error: usersError } = await supabase
+        .from('users_public')
+        .select('user_id, first')
+        .limit(50); // Limit for testing
+
+      if (usersError || !users || users.length === 0) {
+        alert('❌ Error fetching users: ' + (usersError?.message || 'No users found'));
+        return;
+      }
+
+      // Use the first upcoming event again for variety
+      const eventId = '8013abc8-410f-43b1-89b9-69df4505dbcd'; // "F" event
+      const eventTitle = 'F';
+      const eventDate = 'September 2, 2025';
+      const eventTime = '10:00 PM';
+
+      // Schedule for 6 hours from now
+      const executeAt = new Date(Date.now() + 6 * 60 * 60 * 1000);
+
+      const taskData = {
+        mode: 'both', // Required property
+        send_date: executeAt, // Required property - scheduled time
+        users: users.map(u => u.user_id),
+        title: `Join us: ${eventTitle}`,
+        content: `You're invited! ${eventDate} at ${eventTime}`,
+        email_template_name: 'basic_with_button',
+        email_type: 'notification',
+        sender_fullname: 'Gyld Team',
+        secondary_content: 'Don\'t miss this opportunity to connect with your community.',
+        button1_text: 'RSVP Now',
+        button1_url: `https://app.gyld.org/gathering/${eventId}`,
+        unsubscribe_url: 'https://app.gyld.org/unsubscribe',
+        send_push: true,
+        send_email: true,
+        initiated_by: currentUserId,
+        gathering_ID: eventId
+      };
+
+      console.log('HomeScreen: Scheduling push + email event invitation for 6 hours...', { taskData, executeAt });
+      
+      const result = await scheduler.schedule({
+        type: 'orchestration',
+        executeAt,
+        data: taskData
+      });
+      
+      if (result.success) {
+        alert(`🎉 Event Invitation Scheduled (Push + Email)!\n\n` +
+              `✅ Success: Task scheduled\n` +
+              `👥 Recipients: ${users.length} users\n` +
+              `⏰ Will send in: 6 hours\n` +
+              `📱 Push: Yes\n` +
+              `📧 Email: Yes\n` +
+              `📋 Task ID: ${result.taskId}`);
+      } else {
+        alert(`❌ Event Invitation Scheduling Failed!\n\nError: ${result.error}\n\nMessage: ${result.message}`);
+      }
+      
+    } catch (error) {
+      console.error('HomeScreen: Error scheduling event invitation', error);
+      alert(`❌ Event Invitation Scheduling Error!\n\nError: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -1494,6 +1721,34 @@ const handleTestGatheringInviteWithTemplates = async () => {
               onPress={handleDummy3CreateGatherings}
             >
               <Text style={styles.tempButtonText}>📅 Dummy3: Gatherings</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* WILD TESTING: Event Invitation Testing Section */}
+        <View style={styles.tempTestingSection}>
+          <Text style={styles.tempTestingTitle}>🎉 WILD TEST: Event Invitations</Text>
+          <View style={styles.tempButtonGrid}>
+            <TouchableOpacity
+              testID="btnPushPreferred"
+              style={styles.greenButton}
+              onPress={handleEventInvitePushPreferred}
+            >
+              <Text style={styles.greenButtonText}>📱 Push Preferred</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              testID="btnPushEmail3Min"
+              style={styles.greenButton}
+              onPress={handleEventInvitePushPlusEmail3Min}
+            >
+              <Text style={styles.greenButtonText}>⏰ Push + Email (3min)</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              testID="btnPushEmail6Hours"
+              style={styles.greenButton}
+              onPress={handleEventInvitePushPlusEmail6Hours}
+            >
+              <Text style={styles.greenButtonText}>🕕 Push + Email (6hr)</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1839,6 +2094,20 @@ const styles = StyleSheet.create({
   },
   tempButtonText: {
     color: theme.colors.background.primary,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  greenButton: {
+    backgroundColor: '#22c55e', // Green color
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.spacing.sm,
+    minWidth: '48%',
+    alignItems: 'center',
+    marginBottom: theme.spacing.sm,
+  },
+  greenButtonText: {
+    color: 'white',
     fontSize: 14,
     fontWeight: '600',
   },
