@@ -11,8 +11,11 @@ module.exports = {
   testMatch: ['<rootDir>/e2e/**/*.e2e.js'],
   setupFilesAfterEnv: ['<rootDir>/e2e/init.js'],
   reporters: ['detox/runners/jest/reporter'],
+  transform: {
+    '^.+\\.(js|jsx|ts|tsx)$': 'babel-jest',
+  },
   transformIgnorePatterns: [
-    'node_modules/(?!(jest-)?react-native|@react-native|@react-navigation|expo(nent)?|@expo|expo-.*|react-native-.*|@react-native-.*)'
+    'node_modules/(?!(jest-)?react-native|react-native|react-native-.*|@react-native|@react-native-.*|@react-navigation|expo(nent)?|@expo|expo-.*)'
   ],
 };
 
