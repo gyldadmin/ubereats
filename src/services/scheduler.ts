@@ -513,6 +513,16 @@ export class CentralScheduler {
    */
   private async saveTaskToDatabase(task: ScheduledTask): Promise<SchedulerResponse> {
     try {
+      // Resolve current authenticated user for RLS checks
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      if (authError) {
+        throw new Error(`Auth error: ${authError.message}`);
+      }
+      const currentUserId = authData?.user?.id;
+      if (!currentUserId) {
+        throw new Error('No active session. Please sign in to schedule tasks.');
+      }
+
       // Lookup the status UUID
       const statusUuid = await this.lookupStatusUuid(task.status);
       // Lookup workflow type UUID
@@ -520,6 +530,7 @@ export class CentralScheduler {
       
       const dbTask: Partial<DatabaseTask> = {
         id: task.id,
+        user_id: currentUserId, // Required by RLS policy
         workflow_type: typeUuid,
         workflow_data: task.data,
         scheduled_for: task.executeAt.toISOString(),
