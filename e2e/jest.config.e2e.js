@@ -5,8 +5,8 @@
 module.exports = {
   // Ensure <rootDir> resolves to the project root (one level up from this file)
   rootDir: '..',
-  // Use expo-aware preset so RN/Expo modules in node_modules are transpiled
-  preset: 'jest-expo',
+  // Use react-native preset; we manually whitelist RN/Expo modules below
+  preset: 'react-native',
   testEnvironment: 'detox/runners/jest/testEnvironment',
   testMatch: ['<rootDir>/e2e/**/*.e2e.js'],
   setupFilesAfterEnv: ['<rootDir>/e2e/init.js'],
