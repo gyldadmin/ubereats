@@ -22,6 +22,11 @@ jobs:
           NODE_ENV: development
         run: npm ci
 
+      - name: Install AppleSimUtils (required by Detox)
+        run: |
+          brew tap wix/brew
+          brew install applesimutils
+
       - name: Cache iOS build
         id: cache-ios
         uses: actions/cache@v4
