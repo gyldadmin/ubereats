@@ -2,7 +2,7 @@ name: mobile-e2e-detox
 
 on:
   push:
-    branches: [ main, develop, feature/** ]
+    branches: [ main, develop, dev, feature/** ]
   pull_request:
 
 jobs:
