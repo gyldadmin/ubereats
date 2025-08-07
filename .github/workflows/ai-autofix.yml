@@ -21,9 +21,7 @@ jobs:
           node-version: 18
 
       # Install deps so the agent can run tests locally
-      - run: |
-          rm -f package-lock.json
-          npm install --legacy-peer-deps
+      - run: npm ci
 
       - name: Run AI assistant (Cursor)
         uses: cursor-sh/action@v1 # Placeholder, replace with actual Cursor GitHub Action
