@@ -76,6 +76,7 @@ export interface SchedulerResponse {
  */
 export interface DatabaseTask {
   id: string;
+  user_id?: string;
   workflow_type: string;
   workflow_data: any;
   scheduled_for: string; // ISO timestamp

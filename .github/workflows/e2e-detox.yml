@@ -8,6 +8,7 @@ on:
 jobs:
   e2e-ios:
     runs-on: macos-latest
+    concurrency: detox-e2e-${{ github.ref }}
     steps:
       - uses: actions/checkout@v4
 
@@ -21,7 +22,15 @@ jobs:
           NODE_ENV: development
         run: npm ci
 
+      - name: Cache iOS build
+        id: cache-ios
+        uses: actions/cache@v4
+        with:
+          path: ios/build
+          key: ${{ runner.os }}-ios-build-${{ hashFiles('ios/**','app.config.js','package.json','package-lock.json') }}
+
       - name: Build iOS dev client for Detox
+        if: steps.cache-ios.outputs.cache-hit != 'true'
         run: npm run build:e2e:ios
 
       - name: Run Detox tests (iOS)
