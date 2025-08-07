@@ -1,15 +1,5 @@
-// Detox init for Jest (Detox 20+)
-const detox = require('detox');
-const config = require('../.detoxrc.json');
-
-beforeAll(async () => {
-  await detox.init(config);
-}, 300000);
-
-afterAll(async () => {
-  await detox.cleanup();
-});
-
+// Detox 20+: The Jest testEnvironment manages init/cleanup.
+// We keep only a console-error trap to fail tests on runtime errors.
 // Capture console errors during E2E to fail tests automatically
 if (process.env.E2E) {
   const errors = [];
