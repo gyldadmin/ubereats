@@ -3,9 +3,11 @@
  * Uses the Detox-provided test environment and reporter.
  */
 module.exports = {
-  preset: 'react-native',           // works for Expo projects; Detox overrides env
+  // Ensure <rootDir> resolves to the project root (one level up from this file)
+  rootDir: '..',
+  preset: 'react-native',
   testEnvironment: 'detox/runners/jest/testEnvironment',
-  testMatch: ['**/*.e2e.js'],
+  testMatch: ['<rootDir>/e2e/**/*.e2e.js'],
   setupFilesAfterEnv: ['<rootDir>/e2e/init.js'],
   reporters: ['detox/runners/jest/reporter'],
 };
