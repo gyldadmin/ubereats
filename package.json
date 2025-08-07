@@ -57,7 +57,7 @@
     "jest-environment-jsdom": "^30.0.5",
     "metro-react-native-babel-preset": "^0.77.0",
     "typescript": "~5.3.3",
-    "detox": "^20.19.3",
+    "detox": "^20.40.2",
     "jest-circus": "^30.0.5",
     "@testing-library/react-native": "^12.1.5"
   },
