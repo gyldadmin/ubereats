@@ -6,8 +6,8 @@
   "apps": {
     "ios.release": {
       "type": "ios.app",
-      "binaryPath": "ios/build/Build/Products/Release-iphonesimulator/Gyld Native.app",
-      "build": "expo prebuild --platform ios && xcodebuild -workspace ios/*.xcworkspace -scheme \"Gyld Native\" -configuration Release -sdk iphonesimulator -derivedDataPath ios/build"
+      "binaryPath": "ios/build/Build/Products/Release-iphonesimulator/GyldNative.app",
+      "build": "expo prebuild --platform ios && xcodebuild -workspace ios/GyldNative.xcworkspace -scheme GyldNative -configuration Release -sdk iphonesimulator -derivedDataPath ios/build"
     },
     "android.release": {
       "type": "android.apk",
