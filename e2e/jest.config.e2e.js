@@ -8,7 +8,8 @@ module.exports = {
   // Use react-native preset; we manually whitelist RN/Expo modules below
   preset: 'react-native',
   testEnvironment: 'detox/runners/jest/testEnvironment',
-  testMatch: ['<rootDir>/e2e/**/*.e2e.js'],
+  // Exclude this config file itself from matching by using an extglob negation
+  testMatch: ['<rootDir>/e2e/**/!(*jest.config*).e2e.js'],
   setupFilesAfterEnv: ['<rootDir>/e2e/init.js'],
   reporters: ['detox/runners/jest/reporter'],
   transform: {
