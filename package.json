@@ -49,17 +49,18 @@
     "@babel/core": "^7.20.0",
     "@react-native/babel-preset": "^0.80.2",
     "@testing-library/jest-native": "^5.4.3",
+    "@testing-library/react-native": "^12.1.5",
     "@types/jest": "^30.0.0",
     "@types/react": "~18.2.6",
     "@types/uuid": "^10.0.0",
     "babel-jest": "^30.0.5",
+    "detox": "^20.40.2",
     "jest": "^30.0.5",
+    "jest-circus": "^30.0.5",
     "jest-environment-jsdom": "^30.0.5",
     "metro-react-native-babel-preset": "^0.77.0",
-    "typescript": "~5.3.3",
-    "detox": "^20.40.2",
-    "jest-circus": "^30.0.5",
-    "@testing-library/react-native": "^12.1.5"
+    "signal-exit": "^3.0.7",
+    "typescript": "~5.3.3"
   },
   "private": true
 }
