@@ -1,13 +1,10 @@
-// Detox init file
+// Detox init for Jest (Detox 20+)
 const detox = require('detox');
-const adapter = require('detox/runners/jest/adapter');
 const config = require('../.detoxrc.json');
-
-jasmine.getEnv().addReporter(adapter);
 
 beforeAll(async () => {
   await detox.init(config);
-});
+}, 300000);
 
 afterAll(async () => {
   await detox.cleanup();
