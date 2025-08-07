@@ -1,7 +1,8 @@
 {
   "testRunner": {
     "name": "jest",
-    "config": "e2e/jest.config.e2e.js"
+    "args": { "config": "e2e/jest.config.e2e.js", "runInBand": true },
+    "initTimeout": 300000
   },
   "apps": {
     "ios.release": {
