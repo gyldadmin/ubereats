@@ -1,8 +1,8 @@
 // Detox init file
-import { afterAll, beforeAll, jasmine } from '@jest/globals';
-import detox from 'detox';
-import adapter from 'detox/runners/jest/adapter';
-import config from '../.detoxrc.json';
+const { afterAll, beforeAll, jasmine } = require('@jest/globals');
+const detox = require('detox');
+const adapter = require('detox/runners/jest/adapter');
+const config = require('../.detoxrc.json');
 
 jasmine.getEnv().addReporter(adapter);
 
