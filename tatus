@@ -1,0 +1,10 @@
+[33m8e93329c[m[33m ([m[1;36mHEAD -> [m[1;32mdev[m[33m, [m[1;31morigin/dev[m[33m)[m feat: restore full E2E workflow with Detox testing
+[33m9113270d[m test: simplify E2E workflow to debug trigger issue
+[33m9bc2a815[m test: add simple workflow to verify GitHub Actions
+[33m892294ee[m test: trigger E2E workflow
+[33m625ad107[m fix: add dev branch to E2E workflow triggers
+[33m1e3b89ef[m feat: add E2E Detox testing and CI autofix workflows
+[33m44e9abf3[m before orchestator refactor
+[33md41fd259[m Pre-Push
+[33mec10a8f8[m lost database
+[33m9c5fd014[m org gathering partial

@@ -500,22 +500,11 @@ export class CentralScheduler {
       if (data.length > 1) {
         console.warn(`lookupWorkflowTypeUuid: multiple workflow_type rows found for label "${label}" – using first result`);
       }
-      return data[0].id;
+      return data[0]?.id || '';
     }
 
     // Not found: ensure workflow_type table is seeded via migration
-    throw new Error(`Workflow type label \"${label}\" not found in lookup table. Seed it via migration.`);
-    const { data: inserted, error: insertError } = await supabase
-      .from('workflow_type')
-      .insert({ label })
-      .select('id')
-      .single();
-
-    if (insertError || !inserted) {
-      throw new Error(`Failed to insert workflow type for "${label}": ${insertError?.message || 'Insert returned no row'}`);
-    }
-
-    return inserted.id;
+    throw new Error(`Workflow type label "${label}" not found in lookup table. Seed it via migration.`);
   }
 
   /**
