@@ -1,5 +1,4 @@
 // Detox init file
-const { afterAll, beforeAll, jasmine } = require('@jest/globals');
 const detox = require('detox');
 const adapter = require('detox/runners/jest/adapter');
 const config = require('../.detoxrc.json');

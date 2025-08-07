@@ -1,9 +1,7 @@
 {
   "testRunner": {
-    "args": {
-      "config": "e2e/init.js"
-    },
-    "name": "jest"
+    "name": "jest",
+    "config": "e2e/jest.config.e2e.js"
   },
   "apps": {
     "ios.release": {
