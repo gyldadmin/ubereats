@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import Constants from 'expo-constants';
 import { NavigationContainer } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -40,11 +41,31 @@ Notifications.setNotificationHandler({
 
 export default function App() {
   const initialize = useAuthStore(state => state.initialize);
+  const signIn = useAuthStore(state => state.signIn);
 
   useEffect(() => {
     // Initialize auth store when app starts
     initialize();
   }, [initialize]);
+
+  // E2E: auto sign-in a test user so DB writes run under a real session
+  useEffect(() => {
+    const maybeSignIn = async () => {
+      try {
+        const extra: any = (Constants as any)?.expoConfig?.extra ?? {};
+        const isE2E =
+          process.env.E2E === 'true' ||
+          process.env.EXPO_PUBLIC_E2E === 'true' ||
+          extra.EXPO_PUBLIC_E2E === 'true';
+        const email = extra.EXPO_PUBLIC_E2E_EMAIL || process.env.EXPO_PUBLIC_E2E_EMAIL;
+        const password = extra.EXPO_PUBLIC_E2E_PASSWORD || process.env.EXPO_PUBLIC_E2E_PASSWORD;
+        if (isE2E && email && password) {
+          await signIn(email, password);
+        }
+      } catch {}
+    };
+    maybeSignIn();
+  }, [signIn]);
 
   return (
     <SafeAreaProvider>

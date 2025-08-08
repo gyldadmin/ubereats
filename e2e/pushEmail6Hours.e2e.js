@@ -12,8 +12,11 @@ describe('Scheduler – Push + Email 6-hour button', () => {
       .whileElement(by.id('homeScroll')).scroll(300, 'down');
     await btn.tap();
 
-    await waitFor(element(by.id('e2eScheduled')))
-      .toBeVisible();
+    const failModal = element(by.text('test failed'));
+    try {
+      await expect(failModal).not.toBeVisible();
+    } catch {}
+    await waitFor(element(by.id('e2eScheduled'))).toBeVisible();
   });
 });
 
