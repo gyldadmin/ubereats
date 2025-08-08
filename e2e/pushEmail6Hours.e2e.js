@@ -9,8 +9,7 @@ describe('Scheduler – Push + Email 6-hour button', () => {
     const btn = element(by.id('btnPushEmail6Hours'));
     await waitFor(btn)
       .toBeVisible()
-      .whileElement(by.id('homeScroll')).scroll(300, 'down')
-      .withTimeout(60000);
+      .whileElement(by.id('homeScroll')).scroll(300, 'down');
     await btn.tap();
 
     await waitFor(element(by.text('Event Invitation Scheduled')))

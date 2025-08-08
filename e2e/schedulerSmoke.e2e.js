@@ -6,8 +6,7 @@ describe('Scheduler Smoke Test', () => {
   it('opens HomeScreen', async () => {
     await waitFor(element(by.id('btnPushEmail3Min')))
       .toBeVisible()
-      .whileElement(by.id('homeScroll')).scroll(300, 'down')
-      .withTimeout(60000);
+      .whileElement(by.id('homeScroll')).scroll(300, 'down');
   });
 
   // This assumes your green button has testID="btnPushEmail3Min"
@@ -15,8 +14,7 @@ describe('Scheduler Smoke Test', () => {
     const btn = element(by.id('btnPushEmail3Min'));
     await waitFor(btn)
       .toBeVisible()
-      .whileElement(by.id('homeScroll')).scroll(300, 'down')
-      .withTimeout(60000);
+      .whileElement(by.id('homeScroll')).scroll(300, 'down');
     await btn.tap();
 
     // Expect toast / alert / success text
