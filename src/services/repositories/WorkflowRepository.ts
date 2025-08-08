@@ -15,6 +15,7 @@ export interface WorkflowRecord {
   status: string;
   gathering_id?: string | null;
   candidate_id?: string | null;
+  user_id?: string; // owner for RLS
   workflow_id: string;
   workflow_type: string;
   workflow_data: any;
@@ -47,12 +48,20 @@ export class WorkflowRepository {
       status: workflow.status
     });
 
+    // Ensure a signed-in user for RLS
+    const { data: authData } = await supabase.auth.getUser();
+    const currentUserId = authData?.user?.id;
+    if (!currentUserId) {
+      throw new Error('Not signed in – cannot create planned workflow');
+    }
+
     const { data, error } = await supabase
       .from('planned_workflows')
       .insert({
         status: workflow.status,
         gathering_id: workflow.gathering_id,
         candidate_id: workflow.candidate_id,
+        user_id: currentUserId,
         workflow_id: workflow.workflow_id,
         workflow_type: workflow.workflow_type,
         workflow_data: workflow.workflow_data,
