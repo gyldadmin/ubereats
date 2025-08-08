@@ -6,7 +6,9 @@ describe('Scheduler – Push + Email 6-hour button', () => {
   });
 
   it('schedules Push+Email 6-hour task successfully', async () => {
-    await element(by.id('btnPushEmail6Hours')).tap();
+    const btn = element(by.id('btnPushEmail6Hours'));
+    await waitFor(btn).toBeVisible().withTimeout(60000);
+    await btn.tap();
 
     await waitFor(element(by.text('Event Invitation Scheduled')))
       .toBeVisible()

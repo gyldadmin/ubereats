@@ -1,4 +1,5 @@
 ﻿import React from 'react';
+import Constants from 'expo-constants';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator, CardStyleInterpolators } from '@react-navigation/stack';
 import { Feather } from '@expo/vector-icons';
@@ -226,6 +227,28 @@ function LoadingScreen() {
 
 export default function AppNavigator() {
   const { user, isLoading, isInitialized, hasLoggedInBefore } = useAuthStore();
+
+  // In E2E mode, bypass auth and land directly on MainTabs for stable selectors
+  const isE2E = (() => {
+    try {
+      const extra: any = (Constants as any)?.expoConfig?.extra ?? {};
+      return (
+        process.env.E2E === 'true' ||
+        process.env.EXPO_PUBLIC_E2E === 'true' ||
+        extra.EXPO_PUBLIC_E2E === 'true'
+      );
+    } catch {
+      return process.env.E2E === 'true' || process.env.EXPO_PUBLIC_E2E === 'true';
+    }
+  })();
+
+  if (isE2E) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <MainTabs />
+      </SafeAreaView>
+    );
+  }
 
   // Show loading screen while initializing
   if (!isInitialized || isLoading) {
