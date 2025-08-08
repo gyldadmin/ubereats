@@ -16,7 +16,8 @@ export default {
       "**/*"
     ],
           plugins: [
-    "expo-font"
+    "expo-font",
+    "@config-plugins/detox"
   ],
     ios: {
       supportsTablet: true,
