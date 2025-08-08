@@ -17,10 +17,8 @@ describe('Scheduler Smoke Test', () => {
       .whileElement(by.id('homeScroll')).scroll(300, 'down');
     await btn.tap();
 
-    // Expect the iOS alert and press OK
-    await waitFor(element(by.label('OK')))
-      .toBeVisible()
-      .withTimeout(15000);
-    await element(by.label('OK')).tap();
+    // Expect deterministic E2E marker instead of alert text
+    await waitFor(element(by.id('e2eScheduled')))
+      .toBeVisible();
   });
 });

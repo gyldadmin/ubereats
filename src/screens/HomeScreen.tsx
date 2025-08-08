@@ -59,6 +59,8 @@ export default function HomeScreen() {
   
   // State for show more/less functionality
   const [isExpanded, setIsExpanded] = useState(false);
+  // E2E confirmation marker
+  const [e2eScheduled, setE2eScheduled] = useState(false);
 
   // Refresh data when screen comes into focus (e.g., returning from detail screen)
   useFocusEffect(
@@ -1396,6 +1398,7 @@ const handleTestGatheringInviteWithTemplates = async () => {
       });
       
       if (result.success) {
+        if (isE2E) setE2eScheduled(true);
         alert(`🎉 Event Invitation Scheduled (Push + Email)!\n\n` +
               `✅ Success: Task scheduled\n` +
               `👥 Recipients: ${users.length} users\n` +
@@ -1474,6 +1477,7 @@ const handleTestGatheringInviteWithTemplates = async () => {
       });
       
       if (result.success) {
+        if (isE2E) setE2eScheduled(true);
         alert(`🎉 Event Invitation Scheduled (Push + Email)!\n\n` +
               `✅ Success: Task scheduled\n` +
               `👥 Recipients: ${users.length} users\n` +
@@ -1545,6 +1549,9 @@ const handleTestGatheringInviteWithTemplates = async () => {
         style={styles.scrollView} 
         showsVerticalScrollIndicator={false}
       >
+        {isE2E && e2eScheduled && (
+          <View testID="e2eScheduled" accessibilityLabel="e2eScheduled" />
+        )}
         <View style={styles.header}>
           <Text variant="headlineMedium" style={styles.title}>
             Upcoming Gatherings
