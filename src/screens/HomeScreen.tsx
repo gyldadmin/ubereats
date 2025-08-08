@@ -1528,6 +1528,7 @@ const handleTestGatheringInviteWithTemplates = async () => {
   return (
     <View style={styles.container}>
       <ScrollView 
+        testID="homeScroll"
         style={styles.scrollView} 
         showsVerticalScrollIndicator={false}
       >
