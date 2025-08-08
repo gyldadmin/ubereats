@@ -23,6 +23,19 @@ export class EmailService {
     this.sendGridApiKey = this.loadSendGridApiKey();
   }
 
+  private get isE2E(): boolean {
+    try {
+      const extra: any = Constants?.expoConfig?.extra ?? {};
+      return (
+        process.env.E2E === 'true' ||
+        process.env.EXPO_PUBLIC_E2E === 'true' ||
+        extra.EXPO_PUBLIC_E2E === 'true'
+      );
+    } catch {
+      return process.env.E2E === 'true' || process.env.EXPO_PUBLIC_E2E === 'true';
+    }
+  }
+
   /**
    * Main entry point for sending emails immediately
    * All scheduling should now be handled by the central scheduler
@@ -77,8 +90,10 @@ export class EmailService {
       // Build SendGrid payload
       const sendGridPayload = this.buildSendGridPayload(inputs, templateData, senderAddress);
 
-      // Send via SendGrid API
-      const emailId = await this.callSendGridApi(sendGridPayload);
+      // Send via SendGrid API (skip in E2E mode)
+      const emailId = this.isE2E
+        ? 'e2e-message-id'
+        : await this.callSendGridApi(sendGridPayload);
 
       // Record the sent notification
       await this.recordNotificationSent({
@@ -454,6 +469,10 @@ export class EmailService {
    * Utility methods
    */
   private loadSendGridApiKey(): string {
+    if (this.isE2E) {
+      console.log('EmailService: E2E mode – skipping SendGrid key requirement');
+      return 'e2e-dummy';
+    }
     // Try multiple sources for the API key
     let apiKey: string | undefined;
 
