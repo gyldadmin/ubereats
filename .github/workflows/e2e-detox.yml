@@ -48,6 +48,9 @@ jobs:
         run: |
           set -o pipefail
           rm -rf ios/build
+          # Explicitly export environment variables for expo prebuild to embed them
+          export EXPO_PUBLIC_SUPABASE_URL="${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}"
+          export EXPO_PUBLIC_SUPABASE_ANON_KEY="${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}"
           npm run build:e2e:ios 2>&1 | tee build-ios.log
 
       - name: Upload Xcode build logs
