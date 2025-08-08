@@ -11,7 +11,8 @@ module.exports = {
   // Exclude this config file itself from matching by using an extglob negation
   testMatch: ['<rootDir>/e2e/**/!(*jest.config*).e2e.js'],
   setupFilesAfterEnv: ['<rootDir>/e2e/init.js'],
-  reporters: ['detox/runners/jest/reporter'],
+  // Use default Jest reporter to avoid Detox secondary context reporting bug after success
+  // reporters: ['detox/runners/jest/reporter'],
   testTimeout: 300000,
   transform: {
     '^.+\\.(js|jsx|ts|tsx)$': 'babel-jest',
