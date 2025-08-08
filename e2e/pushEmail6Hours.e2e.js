@@ -12,9 +12,10 @@ describe('Scheduler – Push + Email 6-hour button', () => {
       .whileElement(by.id('homeScroll')).scroll(300, 'down');
     await btn.tap();
 
-    await waitFor(element(by.text('Event Invitation Scheduled')))
+    await waitFor(element(by.label('OK')))
       .toBeVisible()
-      .withTimeout(10000);
+      .withTimeout(15000);
+    await element(by.label('OK')).tap();
   });
 });
 

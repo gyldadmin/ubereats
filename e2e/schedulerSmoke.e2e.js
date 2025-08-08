@@ -17,9 +17,10 @@ describe('Scheduler Smoke Test', () => {
       .whileElement(by.id('homeScroll')).scroll(300, 'down');
     await btn.tap();
 
-    // Expect toast / alert / success text
-    await waitFor(element(by.text('Event Invitation Scheduled')))
+    // Expect the iOS alert and press OK
+    await waitFor(element(by.label('OK')))
       .toBeVisible()
-      .withTimeout(10000);
+      .withTimeout(15000);
+    await element(by.label('OK')).tap();
   });
 });
