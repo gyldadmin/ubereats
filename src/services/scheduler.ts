@@ -77,6 +77,7 @@ export interface SchedulerResponse {
 export interface DatabaseTask {
   id: string;
   user_id?: string;
+  workflow_id: string;
   workflow_type: string;
   workflow_data: any;
   scheduled_for: string; // ISO timestamp
@@ -531,6 +532,7 @@ export class CentralScheduler {
       const dbTask: Partial<DatabaseTask> = {
         id: task.id,
         user_id: currentUserId, // Required by RLS policy
+        workflow_id: task.id, // Ensure workflow_id is always populated
         workflow_type: typeUuid,
         workflow_data: task.data,
         scheduled_for: task.executeAt.toISOString(),
